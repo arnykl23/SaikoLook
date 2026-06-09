@@ -129,24 +129,34 @@ async function onUnarchive(record: MessageRecord): Promise<void> {
 
 const AUTO_REFRESH_INTERVAL_MS = 60_000;
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
+const autoRefresh = ref(true);
+
+function startAutoRefresh(): void {
+  if (autoRefreshTimer !== null) return;
+  autoRefreshTimer = setInterval(() => { void load(); }, AUTO_REFRESH_INTERVAL_MS);
+}
+
+function stopAutoRefresh(): void {
+  if (autoRefreshTimer !== null) {
+    clearInterval(autoRefreshTimer);
+    autoRefreshTimer = null;
+  }
+}
+
+function toggleAutoRefresh(): void {
+  autoRefresh.value = !autoRefresh.value;
+  autoRefresh.value ? startAutoRefresh() : stopAutoRefresh();
+}
 
 onMounted(() => {
   void load();
   getProviders()
-    .then((ps) => {
-      availableProviders.value = ps;
-    })
-    .catch(() => {
-      // providers 取得失敗はフィルターチェックボックスが非表示になるだけで非致命的
-    });
-  autoRefreshTimer = setInterval(() => {
-    void load();
-  }, AUTO_REFRESH_INTERVAL_MS);
+    .then((ps) => { availableProviders.value = ps; })
+    .catch(() => {});
+  startAutoRefresh();
 });
 
-onUnmounted(() => {
-  if (autoRefreshTimer !== null) clearInterval(autoRefreshTimer);
-});
+onUnmounted(() => { stopAutoRefresh(); });
 </script>
 
 <template>
@@ -164,6 +174,16 @@ onUnmounted(() => {
         >
           未対応 {{ unhandledCount }}
         </span>
+        <button
+          type="button"
+          class="auto-refresh-btn"
+          :class="{ active: autoRefresh }"
+          :aria-pressed="autoRefresh ? 'true' : 'false'"
+          :title="autoRefresh ? '自動更新 オン（クリックでオフ）' : '自動更新 オフ（クリックでオン）'"
+          @click="toggleAutoRefresh"
+        >
+          {{ autoRefresh ? "自動 ●" : "自動 ○" }}
+        </button>
         <button
           type="button"
           class="refresh"
@@ -297,6 +317,7 @@ onUnmounted(() => {
   border-color: var(--danger);
   font-weight: 700;
 }
+.auto-refresh-btn,
 .refresh,
 .ingest {
   font-size: 13px;
@@ -305,6 +326,10 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
+}
+.auto-refresh-btn.active {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 .ingest {
   border-color: var(--accent);
