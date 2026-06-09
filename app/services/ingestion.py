@@ -73,18 +73,21 @@ class IngestionService:
             logger.info("ingest: アクティブなアカウントなし - スキップ")
             return {"fetched": 0, "inserted": 0, "notified": 0}
 
-        all_emails = []
+        # (email, source_address) のペアで収集し, 後段で source_address を正しく参照できるようにする.
+        # all_emails へ flatten してから source 変数を参照すると最後の source が全件に付く誤りが起きる.
+        email_source_pairs: list[tuple] = []
         for source in sources:
             try:
-                all_emails.extend(source.list_recent(self._settings.ingest_limit))
+                for em in source.list_recent(self._settings.ingest_limit):
+                    email_source_pairs.append((em, source.address))
             except Exception:
                 logger.exception("ingest: ソースの取得に失敗 address=%s", source.address)
 
-        fetched = len(all_emails)
+        fetched = len(email_source_pairs)
         records: list[MessageRecord] = []
         is_new_by_id: dict[str, bool] = {}
 
-        for email in all_emails:
+        for email, source_address in email_source_pairs:
             message_id = MessageRecord.make_id(email.provider, email.id)
             try:
                 analysis = self._analyzer.analyze(email)
@@ -97,7 +100,7 @@ class IngestionService:
                     analysis=analysis,
                     triage_score=score,
                     urgency_score=urgency,
-                    account_address=source.address,
+                    account_address=source_address,
                 )
                 records.append(record)
                 is_new_by_id[message_id] = existing is None

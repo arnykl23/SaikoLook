@@ -35,24 +35,28 @@ function toggleDescending(): void {
 }
 
 // --- Providers ---
+// undefined = フィルターなし（全選択と同等）, [] = 明示的に全解除（0件）
 function isChecked(p: string): boolean {
   const ps = props.modelValue.providers;
-  return !ps || ps.length === 0 || ps.includes(p);
+  if (ps === undefined) return true;
+  return ps.includes(p);
 }
 
 function toggleProvider(p: string): void {
-  const current = props.modelValue.providers ?? [];
-  if (current.length === 0) {
-    // 全選択状態 → 1つ外す → 他全部を選択
-    patch({ providers: props.providers.filter((x) => x !== p) });
+  const current = props.modelValue.providers;
+  const all = props.providers;
+  if (current === undefined) {
+    // 未設定（全表示）→ 1つ外す → 他を明示選択
+    const next = all.filter((x) => x !== p);
+    patch({ providers: next });
   } else if (current.includes(p)) {
     const next = current.filter((x) => x !== p);
-    // 全部外れたら「全表示」に戻す（仕様: 全チェック外し = 全プロバイダ表示）
+    // 全部外れたら [] = 明示的に何も表示しない（undefined にしない）
     patch({ providers: next });
   } else {
     const next = [...current, p];
-    // 全プロバイダが揃ったら配列をリセット（= フィルターなし）
-    patch({ providers: next.length >= props.providers.length ? [] : next });
+    // 全プロバイダが揃ったら undefined（= フィルターなし）に戻す
+    patch({ providers: next.length >= all.length ? undefined : next });
   }
 }
 
@@ -95,20 +99,22 @@ function setUnreadOnly(e: Event): void {
 // --- Accounts ---
 function isAccountChecked(address: string): boolean {
   const as = props.modelValue.account_addresses;
-  return !as || as.length === 0 || as.includes(address);
+  if (as === undefined) return true;
+  return as.includes(address);
 }
 
 function toggleAccount(address: string): void {
-  const current = props.modelValue.account_addresses ?? [];
+  const current = props.modelValue.account_addresses;
   const allAddresses = props.accounts.map((a) => a.address);
-  if (current.length === 0) {
-    patch({ account_addresses: allAddresses.filter((x) => x !== address) });
+  if (current === undefined) {
+    const next = allAddresses.filter((x) => x !== address);
+    patch({ account_addresses: next });
   } else if (current.includes(address)) {
     const next = current.filter((x) => x !== address);
     patch({ account_addresses: next });
   } else {
     const next = [...current, address];
-    patch({ account_addresses: next.length >= allAddresses.length ? [] : next });
+    patch({ account_addresses: next.length >= allAddresses.length ? undefined : next });
   }
 }
 
@@ -116,8 +122,8 @@ function toggleAccount(address: string): void {
 const activeFilterCount = computed<number>(() => {
   let n = 0;
   const q = props.modelValue;
-  if (q.providers && q.providers.length > 0) n++;
-  if (q.account_addresses && q.account_addresses.length > 0) n++;
+  if (q.providers !== undefined) n++;
+  if (q.account_addresses !== undefined) n++;
   if (q.importance_min && q.importance_min > 0) n++;
   if (q.received_after) n++;
   if (q.received_before) n++;
@@ -187,25 +193,6 @@ function capitalize(s: string): string {
       role="group"
       aria-label="フィルター条件"
     >
-      <!-- アカウント -->
-      <div v-if="accounts.length > 0" class="filter-group">
-        <span class="group-label">アカウント</span>
-        <div class="checkbox-row">
-          <label
-            v-for="ac in accounts"
-            :key="ac.id"
-            class="check-item"
-          >
-            <input
-              type="checkbox"
-              :checked="isAccountChecked(ac.address)"
-              @change="toggleAccount(ac.address)"
-            />
-            {{ ac.label }}
-          </label>
-        </div>
-      </div>
-
       <!-- プロバイダ -->
       <div v-if="providers.length > 0" class="filter-group">
         <span class="group-label">アプリ</span>
@@ -221,6 +208,25 @@ function capitalize(s: string): string {
               @change="toggleProvider(p)"
             />
             {{ capitalize(p) }}
+          </label>
+        </div>
+      </div>
+
+      <!-- アカウント -->
+      <div v-if="accounts.length > 0" class="filter-group">
+        <span class="group-label">アカウント</span>
+        <div class="checkbox-row">
+          <label
+            v-for="ac in accounts"
+            :key="ac.id"
+            class="check-item"
+          >
+            <input
+              type="checkbox"
+              :checked="isAccountChecked(ac.address)"
+              @change="toggleAccount(ac.address)"
+            />
+            {{ ac.label }}
           </label>
         </div>
       </div>

@@ -50,8 +50,15 @@ export interface MessagesQuery {
 export async function getMessages(query: MessagesQuery = {}): Promise<MessageRecord[]> {
   const params = new URLSearchParams();
   if (query.archived !== undefined) params.set("archived", String(query.archived));
-  for (const p of query.providers ?? []) params.append("providers", p);
-  for (const a of query.account_addresses ?? []) params.append("account_addresses", a);
+  // undefined = フィルターなし（全表示）, [] = 明示的に全解除（0件）, [...] = 絞り込み
+  if (query.providers !== undefined) {
+    if (query.providers.length === 0) params.append("providers", "__none__");
+    else for (const p of query.providers) params.append("providers", p);
+  }
+  if (query.account_addresses !== undefined) {
+    if (query.account_addresses.length === 0) params.append("account_addresses", "__none__");
+    else for (const a of query.account_addresses) params.append("account_addresses", a);
+  }
   if (query.importance_min !== undefined && query.importance_min > 0) {
     params.set("importance_min", String(query.importance_min));
   }
