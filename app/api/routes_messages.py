@@ -45,7 +45,7 @@ def list_messages(
     archived: bool = Query(default=False),
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    order_by: Literal["triage_score", "received_at", "importance", "urgency"] = Query(
+    order_by: Literal["triage_score", "received_at", "importance"] = Query(
         default="triage_score"
     ),
     descending: bool = Query(default=True),

@@ -21,7 +21,7 @@ class MessageQuery:
     archived: bool = False                  # False=メインフィード, True=アーカイブビュー
     limit: int = 100
     offset: int = 0
-    order_by: str = "triage_score"          # "triage_score" | "received_at" | "importance" | "urgency"
+    order_by: str = "triage_score"          # "triage_score" | "received_at" | "importance"
     descending: bool = True
     providers: list[str] = field(default_factory=list)  # 空なら全プロバイダ
     importance_min: int | None = None

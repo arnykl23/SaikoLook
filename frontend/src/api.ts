@@ -40,7 +40,7 @@ export interface MessagesQuery {
   importance_min?: number;
   received_after?: string;
   received_before?: string;
-  order_by?: "triage_score" | "received_at" | "importance" | "urgency";
+  order_by?: "triage_score" | "received_at" | "importance";
   descending?: boolean;
   unread_only?: boolean;
 }

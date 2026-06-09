@@ -20,7 +20,6 @@ function patch(updates: Partial<MessagesQuery>): void {
 // --- Sort ---
 const ORDER_BY_OPTIONS: Array<{ value: NonNullable<MessagesQuery["order_by"]>; label: string }> = [
   { value: "triage_score", label: "推奨度" },
-  { value: "urgency", label: "緊急度" },
   { value: "received_at", label: "受信日時" },
   { value: "importance", label: "重要度" },
 ];
