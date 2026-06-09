@@ -1,0 +1,91 @@
+"""取得→分析→採点→保存→通知のパイプライン.
+
+IngestionService は各層のポート（MessageSource / Analyzer / Repository /
+Notifier）だけに依存し, 具象を知らない. 1 通の失敗で全体を落とさず, 個別に
+握り込んでログへ残す（観測性）. 本文全文はログ・例外詳細に出さない（LLM02）.
+"""
+
+import logging
+from datetime import datetime, timezone
+
+from app.config import Settings
+from app.domain.triage import compute_triage_score
+from app.models import MessageRecord
+from app.ports import Analyzer, MessageSource, Notifier, Repository
+
+logger = logging.getLogger(__name__)
+
+
+class IngestionService:
+    """取得・分析・採点・保存・通知を 1 サイクルで回すサービス."""
+
+    def __init__(
+        self,
+        source: MessageSource,
+        analyzer: Analyzer,
+        repo: Repository,
+        notifier: Notifier,
+        settings: Settings,
+    ) -> None:
+        self._source = source
+        self._analyzer = analyzer
+        self._repo = repo
+        self._notifier = notifier
+        self._settings = settings
+
+    def run_once(self) -> dict:
+        """1 サイクル実行し件数を返す.
+
+        返り値: ``{"fetched": n, "inserted": m, "notified": k}``.
+        個別メールの失敗は握り込み, 全体を止めない.
+        """
+        now = datetime.now(timezone.utc)
+        emails = self._source.list_recent(self._settings.ingest_limit)
+        fetched = len(emails)
+
+        records: list[MessageRecord] = []
+        is_new_by_id: dict[str, bool] = {}
+
+        for email in emails:
+            message_id = MessageRecord.make_id(email.provider, email.id)
+            try:
+                analysis = self._analyzer.analyze(email)
+                score = compute_triage_score(email, analysis, now)
+                # 新規判定は upsert 前に確認する（state はリポジトリ側が既存保持）.
+                existing = self._repo.get(message_id)
+                record = MessageRecord(
+                    message_id=message_id,
+                    email=email,
+                    analysis=analysis,
+                    triage_score=score,
+                )
+                records.append(record)
+                is_new_by_id[message_id] = existing is None
+            except Exception:
+                logger.exception("ingest: 分析・採点に失敗 message_id=%s", message_id)
+                continue
+
+        inserted = self._repo.upsert_messages(records) if records else 0
+
+        notified = 0
+        threshold = self._settings.notify_importance_threshold
+        for record in records:
+            try:
+                is_new = is_new_by_id.get(record.message_id, False)
+                importance = record.analysis.importance if record.analysis else 0
+                if is_new or importance >= threshold:
+                    if self._notifier.notify(record, dedupe_key=record.message_id):
+                        notified += 1
+            except Exception:
+                logger.exception(
+                    "ingest: 通知に失敗 message_id=%s", record.message_id
+                )
+                continue
+
+        logger.info(
+            "ingest 完了 fetched=%d inserted=%d notified=%d",
+            fetched,
+            inserted,
+            notified,
+        )
+        return {"fetched": fetched, "inserted": inserted, "notified": notified}

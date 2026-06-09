@@ -1,0 +1,113 @@
+# .gitignore — プロジェクト雛形（新規プロジェクトへコピーして使う）
+# セキュリティ最優先: 秘密情報・個人情報を絶対に commit しない
+
+# === 秘密情報 / 認証情報（最重要） ===
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+id_rsa
+id_ed25519
+*.ppk
+*.token
+*.secret
+*secret*.json
+*secret*.yaml
+*secret*.yml
+credentials
+credentials*.json
+secrets.json
+secrets.yaml
+secrets.yml
+.netrc
+.npmrc
+.pypirc
+.htpasswd
+gcloud-*.json
+*service-account*.json
+serviceAccount*.json
+config.local.*
+
+# === secrets/ ディレクトリ（実値は全て除外・example/README のみ追跡） ===
+secrets/*
+!secrets/*.example
+!secrets/*.sample
+!secrets/*.template
+!secrets/README.md
+# 保険: 任意の *.env も除外（secrets/gmail.env, secrets/app.env 等）。example 系は追跡
+*.env
+!*.env.example
+!*.env.sample
+!*.env.template
+
+# === ローカル DB（メール本文＝個人情報を含むため commit 禁止） ===
+*.db
+*.sqlite
+*.sqlite3
+
+# === 個人情報 / 医療データ（commit 禁止） ===
+*.dcm
+*.dicom
+data/
+datasets/
+patient*/
+
+# === Claude Code（個人ローカル設定） ===
+.claude/settings.local.json
+.claude/.commit-msg-pending
+# エージェント間共有ボード（中間生成物．README は残す）
+.claude/board/*
+!.claude/board/README.md
+# 退避用（別プロジェクト由来の混入ファイル．雛形には含めない）
+_archive_claude_remote/
+.claude/
+CLAUDE.md
+DESIGN.md
+OVERVIEW.md
+AGENTS.md
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# === Node / フロントエンド ===
+node_modules/
+dist/
+dist_electron/
+.cache/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# === ML モデル / 大容量バイナリ（必要なら個別に解除） ===
+*.ckpt
+*.pth
+*.pt
+*.onnx
+*.h5
+*.weights
+*.npy
+*.npz
+
+# === OS / エディタ ===
+.DS_Store
+._*
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/

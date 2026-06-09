@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReplyGuard 仕様書 — Gmail 取得 API（コード全解説版）</title>
+<style>
+  :root{
+    --bg:#0f1117;--panel:#1a1d27;--border:#2b3040;--fg:#e6e8ef;--muted:#9aa3b8;
+    --accent:#5b8cff;--accent2:#36c692;--accent3:#c08cff;--warn:#f0a73f;
+    --high:#ff6b6b;--med:#f0a73f;--code-bg:#11141d;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:"Segoe UI","Hiragino Kaku Gothic ProN","Meiryo",system-ui,sans-serif;
+    line-height:1.7;font-size:15px;}
+  .wrap{max-width:1000px;margin:0 auto;padding:40px 24px 90px;}
+  header.hero{border-bottom:1px solid var(--border);padding-bottom:24px;margin-bottom:24px;}
+  h1{font-size:27px;margin:0 0 8px;letter-spacing:.02em;}
+  .sub{color:var(--muted);font-size:14px;}
+  .badges{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;}
+  .badge{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--panel);
+    border:1px solid var(--border);color:var(--muted);}
+  .badge.ok{color:var(--accent2);border-color:#2a5e4a;}
+  nav.toc{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 20px;margin:18px 0 8px;}
+  nav.toc b{font-size:13px;color:var(--muted);}
+  nav.toc ol{margin:8px 0 0;padding-left:22px;columns:2;font-size:14px;}
+  nav.toc a{color:var(--accent);text-decoration:none;}
+  h2{font-size:20px;margin:44px 0 14px;padding-left:10px;border-left:3px solid var(--accent);scroll-margin-top:16px;}
+  h3{font-size:15px;margin:22px 0 8px;color:var(--accent2);}
+  h4{font-size:14px;margin:16px 0 6px;color:var(--accent3);}
+  p{margin:8px 0;} .muted{color:var(--muted);}
+  section.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin:14px 0;}
+  code{background:var(--code-bg);padding:1px 6px;border-radius:5px;
+    font-family:"Consolas","SFMono-Regular",monospace;font-size:13px;color:#cdd6f4;}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;
+    padding:14px 16px;overflow-x:auto;font-size:12.5px;line-height:1.5;}
+  pre code{background:none;padding:0;}
+  pre.lined{counter-reset:ln;}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px;}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{color:var(--muted);font-weight:600;font-size:13px;}
+  tr:last-child td{border-bottom:none;}
+  td code{white-space:nowrap;}
+  ul{margin:8px 0;padding-left:22px;} li{margin:5px 0;}
+  a{color:var(--accent);}
+  .tree{white-space:pre;}
+  .pill{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:700;}
+  .pill.high{background:#3a1f22;color:var(--high);}
+  .pill.med{background:#3a2f1c;color:var(--med);}
+  .pill.fixed{background:#1c3a2c;color:var(--accent2);}
+  .pill.skip{background:#23262f;color:var(--muted);}
+  .note{border-left:3px solid var(--warn);background:#241f17;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px;}
+  .filehdr{font-family:monospace;font-size:13px;color:var(--accent);background:var(--code-bg);
+    border:1px solid var(--border);border-bottom:none;border-radius:8px 8px 0 0;padding:8px 14px;margin-top:18px;}
+  .filehdr + pre{border-radius:0 0 8px 8px;margin-top:0;}
+  .expl{margin:10px 0 4px;}
+  .expl li{margin:6px 0;}
+  .expl li b{color:var(--fg);}
+  footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>ReplyGuard 仕様書 <span style="font-size:15px;color:var(--muted)">— コード全解説版</span></h1>
+  <div class="sub">Gmail メール取得 API（IMAP 方式 / Docker 実行）— 全ソースの逐次解説つき</div>
+  <div class="badges">
+    <span class="badge ok">Status: 動作確認済み</span>
+    <span class="badge">Python 3.12 / FastAPI / Docker</span>
+    <span class="badge">IMAP + アプリパスワード</span>
+    <span class="badge">更新: 2026-06-08</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <b>目次</b>
+  <ol>
+    <li><a href="#s1">目的とスコープ</a></li>
+    <li><a href="#s2">技術選定</a></li>
+    <li><a href="#s3">ファイル構成とアーキテクチャ</a></li>
+    <li><a href="#s4">models.py（全解説）</a></li>
+    <li><a href="#s5">fetch_gmail_imap.py（全解説）</a></li>
+    <li><a href="#s6">main.py（全解説）</a></li>
+    <li><a href="#s7">Docker 構成（全解説）</a></li>
+    <li><a href="#s8">API リファレンス</a></li>
+    <li><a href="#s9">実行方法</a></li>
+    <li><a href="#s10">セキュリティ / レビュー対応</a></li>
+    <li><a href="#s11">制約と次の一手</a></li>
+  </ol>
+</nav>
+
+<!-- 1 -->
+<h2 id="s1">1. 目的とスコープ</h2>
+<section class="card">
+  <p><b>最終ゴール</b>: メール見落とし防止アプリ。Outlook / Gmail を統合し、LLM が各メールの
+  「重要度」「タスクの重さ」を推定してダッシュボードに統合表示する Web サイト。</p>
+  <p><b>本 PoC のスコープ</b>: 第一歩として「Gmail から受信メールを取得し、共通スキーマに正規化して API で返す」までを実装・検証する。</p>
+  <table>
+    <tr><th>やること（実装済み）</th><th>やらないこと（次フェーズ）</th></tr>
+    <tr>
+      <td>
+        ・Gmail 受信トレイから最新メール取得<br>
+        ・件名/差出人/宛先/日時/未読/スニペットの正規化<br>
+        ・<code>GET /emails</code> で JSON 配列を返す API<br>
+        ・CLI 表示（動作確認用）<br>
+        ・Docker だけで完結
+      </td>
+      <td class="muted">
+        ・LLM による重要度・タスク推定<br>
+        ・本文フル取得 / 添付処理<br>
+        ・Web ダッシュボード UI<br>
+        ・Outlook 連携 / 永続 DB / 認証<br>
+        ・マルチユーザ
+      </td>
+    </tr>
+  </table>
+</section>
+
+<!-- 2 -->
+<h2 id="s2">2. 技術選定</h2>
+<table>
+  <tr><th>項目</th><th>採用</th><th>理由</th></tr>
+  <tr><td>言語/実行</td><td>Python 3.12 (slim) on Docker</td><td>ローカル環境非依存・再現性。LLM/SDK 連携も容易。</td></tr>
+  <tr><td>API</td><td>FastAPI + uvicorn</td><td>型から自動でバリデーション/JSON化/Swagger生成。</td></tr>
+  <tr><td>取得方式</td><td>IMAP（標準ライブラリ <code>imaplib</code>）</td><td>追加依存ゼロ。Google Cloud 設定が不要。</td></tr>
+  <tr><td>認証</td><td>アプリパスワード</td><td>OAuth 同意画面が不要で最速。2段階認証が前提。</td></tr>
+  <tr><td>設定注入</td><td>docker-compose <code>env_file</code></td><td>認証情報をコードから分離し <code>secrets/</code> に隔離。</td></tr>
+</table>
+<p class="muted">※ OAuth + Gmail API 版（<code>app/fetch_gmail.py</code>）も予備同梱だが、現行デフォルト経路では未使用。</p>
+
+<!-- 3 -->
+<h2 id="s3">3. ファイル構成とアーキテクチャ</h2>
+<p>責務は3層。依存は<b>上→下の一方向</b>で、下ほど安定・汎用。</p>
+<table>
+  <tr><th>層</th><th>ファイル</th><th>責務</th></tr>
+  <tr><td>API層</td><td><code>app/main.py</code></td><td>HTTP の入口。<code>GET /emails</code>。実処理は取得層へ委譲。</td></tr>
+  <tr><td>取得層</td><td><code>app/fetch_gmail_imap.py</code></td><td>Gmail に IMAP 接続し <code>EmailMessage</code> のリストを返す。API/CLI 共用。</td></tr>
+  <tr><td>スキーマ層</td><td><code>app/models.py</code></td><td>共通モデル <code>EmailMessage</code> の定義。</td></tr>
+</table>
+<section class="card">
+<pre class="tree"><code>app/
+├── __init__.py            パッケージ化（import を成立させる空ファイル）
+├── models.py              EmailMessage（共通スキーマ）
+├── fetch_gmail_imap.py    取得層: fetch_emails() ＋ CLI
+├── main.py                API層: FastAPI / GET /emails
+└── fetch_gmail.py         予備（OAuth/Gmail API版・未使用）
+docker/
+├── Dockerfile             python:3.12-slim ベースのイメージ定義
+└── docker-compose.yml     api / gmail-poc / gmail-poc-oauth の3サービス
+secrets/
+├── gmail.env              認証情報（gitignore済み）
+└── gmail.env.example      テンプレート
+docs/
+├── poc-email-ingestion.md 方針
+├── spec.html              本ドキュメント
+└── architecture.html      アーキテクチャ図解
+requirements.txt           fastapi / uvicorn / google-*
+.gitignore</code></pre>
+</section>
+
+<!-- 4 -->
+<h2 id="s4">4. <code>app/models.py</code> — 共通スキーマ（全解説）</h2>
+<div class="filehdr">app/models.py</div>
+<pre><code>from datetime import datetime
+from pydantic import BaseModel
+
+
+class EmailMessage(BaseModel):
+    id: str                       # 取得元の安定識別子（Gmail は IMAP UID）
+    provider: str = "gmail"       # "gmail" | "outlook" など
+    subject: str = ""
+    sender: str = ""              # "Name &lt;addr&gt;"
+    to: list[str] = []
+    received_at: datetime | None = None
+    snippet: str = ""             # 本文先頭のプレビュー
+    is_unread: bool = False
+
+    # 次フェーズ(LLM)で埋める想定の余地（PoC では未使用）
+    # body_text: str | None = None
+    # importance: int | None = None</code></pre>
+<ul class="expl">
+  <li><b><code>BaseModel</code> を継承</b> — pydantic のモデル。型に基づき自動でバリデーションと JSON シリアライズを行う。FastAPI の <code>response_model</code> にそのまま使える。</li>
+  <li><b><code>id: str</code></b> — メールの安定識別子。Gmail では IMAP <b>UID</b> を入れる（後述）。位置で変わるシーケンス番号は使わない。</li>
+  <li><b><code>provider</code></b> — 取得元の種別。将来 Outlook を足したとき <code>"outlook"</code> を入れて区別する。デフォルト <code>"gmail"</code>。</li>
+  <li><b><code>subject</code>/<code>sender</code></b> — 件名・差出人。デコード済みの可読文字列を入れる。</li>
+  <li><b><code>to: list[str]</code></b> — 宛先アドレスのリスト。</li>
+  <li><b><code>received_at: datetime | None</code></b> — 受信日時。パース失敗時は <code>None</code>。FastAPI が ISO 文字列に自動変換。</li>
+  <li><b><code>snippet</code></b> — 本文プレビュー（先頭120字）。</li>
+  <li><b><code>is_unread</code></b> — 未読フラグ。</li>
+  <li><b>コメントアウトの2行</b> — 次フェーズで本文全文 (<code>body_text</code>)・LLM スコア (<code>importance</code>) を足す予定地。スキーマ拡張で UI/API はそのまま使える設計意図を明示。</li>
+</ul>
+
+<!-- 5 -->
+<h2 id="s5">5. <code>app/fetch_gmail_imap.py</code> — 取得層（全解説）</h2>
+<p>このファイルが心臓部。役割ごとに関数を分け、<code>fetch_emails()</code> が中核。</p>
+
+<h3>5.1 import と定数</h3>
+<div class="filehdr">app/fetch_gmail_imap.py — 冒頭</div>
+<pre><code>import email
+import email.message
+import imaplib
+import os
+import re
+from email.header import decode_header, make_header
+from email.utils import parsedate_to_datetime
+
+from app.models import EmailMessage
+
+IMAP_HOST = "imap.gmail.com"
+IMAP_PORT = 993
+IMAP_TIMEOUT = 10  # 秒。接続/ログイン/取得が詰まってワーカーが固まるのを防ぐ
+MAX_RESULTS = 10
+PREVIEW_BYTES = 16384</code></pre>
+<ul class="expl">
+  <li><b><code>imaplib</code></b> — Python 標準の IMAP クライアント。これだけで Gmail に接続できるので追加依存が要らない。</li>
+  <li><b><code>email</code> 系</b> — 取得した生メールのパースとデコードに使う標準ライブラリ。<code>decode_header/make_header</code> は <code>=?UTF-8?B?...?=</code> 形式のヘッダ復元、<code>parsedate_to_datetime</code> は日付文字列→<code>datetime</code>。</li>
+  <li><b><code>re</code></b> — FETCH 応答テキストから UID を正規表現で抜くのに使用。</li>
+  <li><b><code>IMAP_TIMEOUT=10</code></b> — ソケットタイムアウト（秒）。接続/ログイン/取得が固まってもワーカーが無限に詰まらないようにする安全弁。</li>
+  <li><b><code>MAX_RESULTS=10</code></b> — 取得件数の既定。</li>
+  <li><b><code>PREVIEW_BYTES=16384</code></b> — 1通あたりの取得上限バイト。ヘッダはメール先頭にあるので16KBで件名等＋本文先頭が取れ、巨大な添付込みメールでも全文を落とさない。</li>
+</ul>
+
+<h3>5.2 <code>decode()</code> — ヘッダの文字化け対策</h3>
+<div class="filehdr">app/fetch_gmail_imap.py</div>
+<pre><code>def decode(value: str | None) -> str:
+    if not value:
+        return ""
+    try:
+        return str(make_header(decode_header(value)))
+    except Exception:
+        return value</code></pre>
+<ul class="expl">
+  <li>件名や差出人は <code>=?UTF-8?B?...?=</code> のようにエンコードされていることが多い（日本語メールで頻出）。</li>
+  <li><b><code>decode_header()</code></b> でパーツ分解 → <b><code>make_header()</code></b> で結合 → <code>str()</code> で可読文字列に復元。これが無いと件名が文字化けする。</li>
+  <li><code>None</code>/空は <code>""</code>、復元失敗時は元値をそのまま返す防御的実装。</li>
+</ul>
+
+<h3>5.3 <code>extract_snippet()</code> — 本文プレビュー抽出</h3>
+<div class="filehdr">app/fetch_gmail_imap.py</div>
+<pre><code>def extract_snippet(msg: email.message.Message, limit: int = 120) -> str:
+    """text/plain を優先して本文の先頭を取り出す。"""
+    text = ""
+    if msg.is_multipart():
+        for part in msg.walk():
+            if part.get_content_type() == "text/plain" and not part.get_filename():
+                payload = part.get_payload(decode=True) or b""
+                charset = part.get_content_charset() or "utf-8"
+                text = payload.decode(charset, errors="replace")
+                break
+    else:
+        payload = msg.get_payload(decode=True) or b""
+        charset = msg.get_content_charset() or "utf-8"
+        text = payload.decode(charset, errors="replace")
+
+    text = " ".join(text.split())  # 改行・連続空白を畳む
+    return text[:limit]</code></pre>
+<ul class="expl">
+  <li>メールは「テキスト版＋HTML版＋添付」が同梱(multipart)なことが多い。</li>
+  <li><b><code>msg.walk()</code></b> で全パートを巡回し、<b><code>text/plain</code> かつ添付でない</b>(<code>get_filename()</code> が無い)パートを採用。</li>
+  <li><b><code>get_payload(decode=True)</code></b> で base64/quoted-printable を自動デコードしてバイト列を取得 → そのパートの <code>charset</code> で文字列化（不明なら UTF-8、壊れた文字は <code>errors="replace"</code> で置換）。</li>
+  <li>非 multipart のメールは本文がそのまま payload なので、その分岐で処理。</li>
+  <li><b><code>" ".join(text.split())</code></b> で改行・連続空白を1つに畳み、<code>[:limit]</code> で先頭120字に切り詰め。</li>
+</ul>
+
+<h3>5.4 <code>_get_credentials()</code> — 認証情報の取得</h3>
+<div class="filehdr">app/fetch_gmail_imap.py</div>
+<pre><code>def _get_credentials() -> tuple[str, str]:
+    address = os.environ.get("GMAIL_ADDRESS", "").strip()
+    app_password = os.environ.get("GMAIL_APP_PASSWORD", "").replace(" ", "")
+    if not address or not app_password:
+        raise RuntimeError(
+            "環境変数 GMAIL_ADDRESS / GMAIL_APP_PASSWORD が未設定です "
+            "(secrets/gmail.env を確認してください)。"
+        )
+    return address, app_password</code></pre>
+<ul class="expl">
+  <li>認証情報はコードに書かず<b>環境変数</b>から読む（<code>secrets/gmail.env</code> 由来）。</li>
+  <li>アプリパスワードは表示が <code>llcb kglc ...</code> のように空白区切りなので <code>.replace(" ", "")</code> で詰める。env にどちらの形式で書いても通る。</li>
+  <li>未設定なら <code>RuntimeError</code>。これは上位（API/CLI）で適切に変換される（後述）。</li>
+</ul>
+
+<h3>5.5 <code>_connect()</code> — IMAP 接続</h3>
+<div class="filehdr">app/fetch_gmail_imap.py</div>
+<pre><code>def _connect() -> imaplib.IMAP4_SSL:
+    address, app_password = _get_credentials()
+    # timeout を付け、接続/ログインが固まってもワーカーが無限に詰まらないように。
+    imap = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT, timeout=IMAP_TIMEOUT)
+    try:
+        imap.login(address, app_password)
+    except imaplib.IMAP4.error as e:
+        raise RuntimeError(
+            f"ログイン失敗: {e} / 2段階認証とアプリパスワードを確認してください。"
+        )
+    return imap</code></pre>
+<ul class="expl">
+  <li><b><code>IMAP4_SSL(... , timeout=10)</code></b> — <code>imap.gmail.com:993</code> に SSL 接続。タイムアウト付きで可用性リスクを低減（レビュー対応）。</li>
+  <li>ログイン失敗は <code>RuntimeError</code> に変換し、原因（2段階認証/アプリパスワード）を案内。</li>
+  <li>INBOX の選択はここでは行わず、件数取得とまとめて <code>fetch_emails()</code> 側で行う。</li>
+</ul>
+
+<h3>5.6 <code>_build_message()</code> — 1通を EmailMessage に変換</h3>
+<div class="filehdr">app/fetch_gmail_imap.py</div>
+<pre><code>def _build_message(descriptor: bytes, raw: bytes) -> EmailMessage:
+    # FETCH 応答の記述子から UID と既読状態を取り出す。
+    uid_match = re.search(rb"UID (\d+)", descriptor)
+    uid = uid_match.group(1).decode() if uid_match else ""
+    is_unread = b"\\Seen" not in descriptor
+
+    msg = email.message_from_bytes(raw)
+    try:
+        received = parsedate_to_datetime(msg.get("Date"))
+    except Exception:
+        received = None
+
+    to = [a.strip() for a in decode(msg.get("To")).split(",") if a.strip()]
+    return EmailMessage(
+        id=uid,
+        provider="gmail",
+        subject=decode(msg.get("Subject")),
+        sender=decode(msg.get("From")),
+        to=to,
+        received_at=received,
+        snippet=extract_snippet(msg),
+        is_unread=is_unread,
+    )</code></pre>
+<ul class="expl">
+  <li>引数は2つ。<b><code>descriptor</code></b>＝FETCH 応答のメタ行（例 <code>b"3 (UID 4 FLAGS (\\Seen) BODY[]&lt;0&gt; {16384}"</code>）、<b><code>raw</code></b>＝メール本体バイト列。</li>
+  <li><b>UID 抽出</b> — <code>re.search(rb"UID (\d+)", ...)</code> で記述子から UID を取得。これを <code>id</code> にすることで安定識別子になる（シーケンス番号を使わない＝レビュー対応）。</li>
+  <li><b>未読判定</b> — 記述子に <code>\Seen</code> フラグが<b>無ければ</b>未読。</li>
+  <li><b><code>email.message_from_bytes(raw)</code></b> — 生バイトを <code>Message</code> にパース。以降 <code>msg.get("Subject")</code> 等でヘッダ取得。</li>
+  <li><b>受信日時</b> — <code>Date</code> ヘッダを <code>datetime</code> 化。失敗時 <code>None</code>。</li>
+  <li><b>宛先</b> — <code>To</code> をデコードしてカンマ分割（簡易）。</li>
+  <li>最後に各フィールドを詰めて <code>EmailMessage</code> を生成して返す。</li>
+</ul>
+
+<h3>5.7 <code>fetch_emails()</code> — 取得の中核</h3>
+<div class="filehdr">app/fetch_gmail_imap.py</div>
+<pre><code>def fetch_emails(limit: int = MAX_RESULTS) -> list[EmailMessage]:
+    """受信トレイの最新メールを共通スキーマで返す（新しい順）。"""
+    imap = _connect()
+    try:
+        # SELECT の応答に総件数(EXISTS)が入る。これを使い、全件 SEARCH せず
+        # 末尾(=最新) limit 件だけを位置指定で取得する（大きい受信箱でも軽量）。
+        status, data = imap.select("INBOX", readonly=True)
+        if status != "OK":
+            raise RuntimeError(f"INBOX を開けませんでした: {data}")
+        total = int(data[0]) if data and data[0] else 0
+        if total == 0:
+            return []
+
+        start = max(1, total - limit + 1)
+        seq_set = f"{start}:{total}"  # 末尾 limit 件のシーケンス範囲（このセッション内限定）
+        # UID も同時取得して安定IDにする。先頭 PREVIEW_BYTES のみ・PEEK で既読化しない。
+        status, msg_data = imap.fetch(
+            seq_set, f"(UID FLAGS BODY.PEEK[]&lt;0.{PREVIEW_BYTES}&gt;)"
+        )
+        if status != "OK":
+            raise RuntimeError("メールの取得に失敗しました。")
+
+        results = [
+            _build_message(item[0] or b"", item[1])
+            for item in msg_data
+            if isinstance(item, tuple)
+        ]
+        results.reverse()  # シーケンス昇順 → 新しい順に
+        return results
+    finally:
+        try:
+            imap.logout()
+        except Exception:
+            pass</code></pre>
+<ul class="expl">
+  <li><b><code>imap.select("INBOX", readonly=True)</code></b> — 受信トレイを<b>読み取り専用</b>で開く（既読化しない）。応答 <code>data[0]</code> に総件数(EXISTS)が入る。</li>
+  <li><b>失敗チェック</b> — SELECT が <code>OK</code> でなければ <code>RuntimeError</code>（レビュー指摘の「失敗をエラー扱い」対応）。</li>
+  <li><b><code>total</code> と件数0処理</b> — 件数を <code>int</code> 化。0 件なら空リストを返す。</li>
+  <li><b>全件 SEARCH をしない</b> — <code>start = total - limit + 1</code> として<b>末尾 limit 件のシーケンス範囲 <code>start:total</code></b> だけを対象にする。大きい受信箱でも全 UID 列挙のコストを払わない（レビュー対応の肝）。シーケンス番号は<b>この選択セッション内だけ</b>の一時的な位置指定に使い、外部に返さない。</li>
+  <li><b><code>imap.fetch(seq_set, "(UID FLAGS BODY.PEEK[]&lt;0.16384&gt;)")</code></b> — 範囲内の各メールについて、UID・フラグ・先頭16KB本文を一括取得。<code>PEEK</code> なので既読フラグを変えない。</li>
+  <li><b>結果組み立て</b> — 応答リストの各タプルを <code>_build_message()</code> で <code>EmailMessage</code> 化。<code>tuple</code> でない区切り要素は除外。</li>
+  <li><b><code>results.reverse()</code></b> — シーケンス昇順（古い順）で返るので反転し新しい順に。</li>
+  <li><b><code>finally: imap.logout()</code></b> — 例外の有無に関わらず必ず接続を閉じる。</li>
+</ul>
+
+<h3>5.8 <code>main()</code> — CLI 表示</h3>
+<div class="filehdr">app/fetch_gmail_imap.py — 末尾</div>
+<pre><code>def main() -> None:
+    try:
+        emails = fetch_emails()
+    except RuntimeError as e:
+        raise SystemExit(str(e))
+
+    if not emails:
+        print("受信トレイにメールが見つかりませんでした。")
+        return
+
+    print(f"\n===== 受信トレイ 最新 {len(emails)} 件 =====\n")
+    for i, m in enumerate(emails, 1):
+        date = m.received_at.isoformat() if m.received_at else ""
+        print(f"[{i}] {'●未読' if m.is_unread else '  既読'}  {date}")
+        print(f"    From   : {m.sender}")
+        print(f"    Subject: {m.subject}")
+        print(f"    Snippet: {m.snippet}")
+        print()
+
+
+if __name__ == "__main__":
+    main()</code></pre>
+<ul class="expl">
+  <li>同じ <code>fetch_emails()</code> を使い、結果をターミナルに整形表示する CLI。</li>
+  <li><b>エラー変換</b> — <code>RuntimeError</code> を <code>SystemExit</code> にして、メッセージ表示＋終了コードで終わる（CLI らしい振る舞い）。API 側は同じ例外を HTTP 500 に変換する＝<b>層ごとに適切なエラー処理</b>。</li>
+  <li><code>●未読</code>/<code>既読</code> を付けて一覧表示。</li>
+  <li><b><code>if __name__ == "__main__"</code></b> — <code>python -m app.fetch_gmail_imap</code> で実行したときだけ <code>main()</code> が動く。import 時には動かないのでライブラリとしても安全。</li>
+</ul>
+
+<!-- 6 -->
+<h2 id="s6">6. <code>app/main.py</code> — API層（全解説）</h2>
+<div class="filehdr">app/main.py</div>
+<pre><code>import os
+
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.fetch_gmail_imap import MAX_RESULTS, fetch_emails
+from app.models import EmailMessage
+
+app = FastAPI(title="ReplyGuard API", version="0.1.0")
+
+# CORS は許可 origin を明示（ワイルドカードは使わない）。
+_default_origins = (
+    "http://localhost:3000,http://127.0.0.1:3000,"
+    "http://localhost:5173,http://127.0.0.1:5173"
+)
+ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.environ.get("ALLOWED_ORIGINS", _default_origins).split(",")
+    if o.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+def health() -> dict:
+    return {"status": "ok"}
+
+
+@app.get("/emails", response_model=list[EmailMessage])
+def get_emails(limit: int = Query(MAX_RESULTS, ge=1, le=50)) -> list[EmailMessage]:
+    try:
+        return fetch_emails(limit=limit)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))</code></pre>
+<ul class="expl">
+  <li><b><code>app = FastAPI(...)</code></b> — アプリ本体。<code>title</code>/<code>version</code> は Swagger に表示される。</li>
+  <li><b>CORS 設定</b> — <code>ALLOWED_ORIGINS</code> を環境変数（既定はローカル開発ポート）から構築し、<b>ワイルドカードを使わず</b>明示した origin だけ許可。これにより別オリジンの悪意あるサイトがブラウザ経由で <code>/emails</code> のレスポンスを読むのを防ぐ（レビュー対応）。</li>
+  <li><b><code>allow_methods=["GET"]</code></b> — 読み取り専用 API なので GET のみ許可。</li>
+  <li><b><code>/health</code></b> — 死活監視・起動待ち判定用。<code>{"status":"ok"}</code> を返す。</li>
+  <li><b><code>/emails</code></b> — メイン。<code>response_model=list[EmailMessage]</code> で<b>出力型を保証</b>し、自動 JSON 化＋Swagger ドキュメント生成。</li>
+  <li><b><code>limit: int = Query(10, ge=1, le=50)</code></b> — クエリパラメータ。1〜50 の範囲バリデーション付き。範囲外は FastAPI が 422 で弾く。</li>
+  <li><b>エラー変換</b> — 取得層の <code>RuntimeError</code>（認証失敗・取得失敗）を <b>HTTP 500</b> に変換して返す。</li>
+  <li>この層は<b>薄い</b>のが要点。実処理は持たず取得層に委譲する。</li>
+</ul>
+<p class="muted">補足: <code>app/__init__.py</code> は空ファイルだが、<code>app/</code> をパッケージ化し <code>from app.xxx import ...</code> や <code>uvicorn app.main:app</code>、<code>python -m app.fetch_gmail_imap</code> を成立させるために必要。</p>
+
+<!-- 7 -->
+<h2 id="s7">7. Docker 構成（全解説）</h2>
+
+<h3>7.1 Dockerfile</h3>
+<div class="filehdr">docker/Dockerfile</div>
+<pre><code>FROM python:3.12-slim
+
+WORKDIR /app
+
+# ビルドコンテキストはプロジェクトルート (docker-compose.yml の context: .. を参照)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+
+# API サーバのポート
+EXPOSE 8000
+
+# 既定は CLI 取得（API は compose の api サービスで起動）
+CMD ["python", "-m", "app.fetch_gmail_imap"]</code></pre>
+<ul class="expl">
+  <li><b><code>python:3.12-slim</code></b> — 軽量な公式 Python イメージ。</li>
+  <li><b><code>WORKDIR /app</code></b> — 作業/実行ディレクトリ。<code>app/</code> パッケージはこの下に置かれる。</li>
+  <li><b>requirements を先にコピー→install</b> — コードより先に依存を入れることで、コードだけ変更した再ビルドが Docker レイヤキャッシュで高速になる定石。</li>
+  <li><b><code>COPY app ./app</code></b> — アプリコードをイメージに焼き込む。</li>
+  <li><b><code>EXPOSE 8000</code></b> — API ポートの宣言（ドキュメント目的）。</li>
+  <li><b><code>CMD</code></b> — 既定は CLI 実行。API は compose 側で <code>command</code> を上書きして起動する。</li>
+</ul>
+
+<h3>7.2 docker-compose.yml（3サービス）</h3>
+<div class="filehdr">docker/docker-compose.yml</div>
+<pre><code>services:
+  api:
+    build: { context: .., dockerfile: docker/Dockerfile }
+    env_file: [ ../secrets/gmail.env ]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports: [ "127.0.0.1:8000:8000" ]    # ホストは loopback 限定
+
+  gmail-poc:
+    build: { context: .., dockerfile: docker/Dockerfile }
+    env_file: [ ../secrets/gmail.env ]
+    command: ["python", "-m", "app.fetch_gmail_imap"]
+    stdin_open: true
+    tty: true
+
+  gmail-poc-oauth:                       # 予備・未使用
+    build: { context: .., dockerfile: docker/Dockerfile }
+    ports: [ "127.0.0.1:8080:8080" ]
+    volumes: [ "../secrets:/app/secrets" ]
+    command: ["python", "-m", "app.fetch_gmail"]
+    stdin_open: true
+    tty: true</code></pre>
+<ul class="expl">
+  <li><b>1つのイメージを共有</b>し、<code>command</code> だけ変えて3用途に使い分ける。</li>
+  <li><b><code>build.context: ..</code></b> — ビルド基準をプロジェクトルートにし、<code>requirements.txt</code>/<code>app/</code> を含める。</li>
+  <li><b><code>env_file: ../secrets/gmail.env</code></b> — 認証情報を環境変数としてコンテナに注入。コードの <code>os.environ.get(...)</code> に届く。</li>
+  <li><b><code>api</code></b> — uvicorn で FastAPI を起動。<code>--host 0.0.0.0</code> はコンテナ内で待受、ホスト公開は <code>127.0.0.1:8000</code> に<b>限定</b>（LAN へ出さない）。</li>
+  <li><b><code>gmail-poc</code></b> — CLI 一覧表示。<code>tty</code> 有効で整形出力を見やすく。</li>
+  <li><b><code>gmail-poc-oauth</code></b> — OAuth 版の予備。<code>secrets/</code> をマウントし <code>credentials.json</code> を渡す想定。現状は未使用。</li>
+</ul>
+
+<!-- 8 -->
+<h2 id="s8">8. API リファレンス</h2>
+<table>
+  <tr><th>メソッド/パス</th><th>パラメータ</th><th>応答</th></tr>
+  <tr><td><code>GET /health</code></td><td>—</td><td><code>{"status":"ok"}</code></td></tr>
+  <tr><td><code>GET /emails</code></td><td><code>limit</code>（1〜50, 既定10）</td><td><code>EmailMessage</code> の JSON 配列（新しい順）</td></tr>
+  <tr><td><code>GET /docs</code></td><td>—</td><td>Swagger UI（自動生成）</td></tr>
+</table>
+<h4>レスポンス例（<code>GET /emails?limit=1</code>）</h4>
+<pre><code>[
+  {
+    "id": "6",
+    "provider": "gmail",
+    "subject": "セキュリティ通知",
+    "sender": "Google &lt;no-reply@accounts.google.com&gt;",
+    "to": ["you@gmail.com"],
+    "received_at": "2026-06-08T06:10:41Z",
+    "snippet": "アカウントにログインするためのアプリ パスワードが作成されました ...",
+    "is_unread": true
+  }
+]</code></pre>
+
+<!-- 9 -->
+<h2 id="s9">9. 実行方法</h2>
+<section class="card">
+  <h4>事前準備（初回のみ）</h4>
+  <ul>
+    <li>Google アカウントで <b>2段階認証を ON</b></li>
+    <li><a href="https://myaccount.google.com/apppasswords">アプリパスワード</a>を発行</li>
+    <li><code>secrets/gmail.env</code> に記入:
+      <pre><code>GMAIL_ADDRESS=you@gmail.com
+GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx</code></pre>
+    </li>
+  </ul>
+  <h4>API として使う</h4>
+  <pre><code># 起動
+docker compose -f docker/docker-compose.yml up -d api
+# ブラウザ: http://127.0.0.1:8000/emails  /  http://127.0.0.1:8000/docs
+# 停止
+docker compose -f docker/docker-compose.yml down</code></pre>
+  <h4>CLI として使う</h4>
+  <pre><code>docker compose -f docker/docker-compose.yml run --rm gmail-poc</code></pre>
+  <h4>コード変更時</h4>
+  <pre><code>docker compose -f docker/docker-compose.yml build   # 焼き込み式なので再ビルド必須</code></pre>
+</section>
+
+<!-- 10 -->
+<h2 id="s10">10. セキュリティ / レビュー対応</h2>
+<p class="muted">Codex アドバサリアルレビュー（実装方針への挑戦的レビュー）の指摘と対応履歴。</p>
+<table>
+  <tr><th>指摘</th><th>重大度</th><th>対応</th></tr>
+  <tr><td>IMAP が <code>RFC822</code> でメール全文（添付込み）取得 → 巨大メールで失敗・遅延</td><td><span class="pill med">medium</span></td>
+    <td><span class="pill fixed">修正済</span> <code>BODY.PEEK[]&lt;0.16384&gt;</code> で先頭16KBに限定。</td></tr>
+  <tr><td>ワイルドカード CORS で受信トレイが他オリジンから読める</td><td><span class="pill high">high</span></td>
+    <td><span class="pill fixed">修正済</span> <code>allow_origins</code> を明示・<code>GET</code> 限定。</td></tr>
+  <tr><td>ID に不安定な IMAP シーケンス番号を使用</td><td><span class="pill med">medium</span></td>
+    <td><span class="pill fixed">修正済</span> <code>UID</code> を取得・採用。位置指定は同一セッション内限定。</td></tr>
+  <tr><td>タイムアウト無し＋毎回 <code>UID SEARCH ALL</code> で全件列挙 → ワーカー詰まり/大受信箱で重い</td><td><span class="pill med">medium</span></td>
+    <td><span class="pill fixed">修正済</span> <code>timeout=10</code> 追加。SELECT の件数から末尾N件だけ範囲取得し全件 SEARCH を廃止。SELECT/FETCH 失敗をエラー化。</td></tr>
+  <tr><td><code>/emails</code> に認証境界が無い（CORS は認証ではない）</td><td><span class="pill high">high</span></td>
+    <td><span class="pill skip">見送り</span> PoC のローカル用途のため未対応。本格化/共有時に env トークン照合を追加予定。</td></tr>
+  <tr><td>OAuth コールバックを <code>0.0.0.0</code> 公開（予備の OAuth 版）</td><td><span class="pill high">high</span></td>
+    <td><span class="pill skip">対象外</span> OAuth 版は未使用。ホスト公開は <code>127.0.0.1</code> 限定に変更済み。</td></tr>
+</table>
+<h4>その他の運用上の配慮</h4>
+<ul>
+  <li>認証情報は <code>secrets/</code> に隔離し <code>.gitignore</code> で除外。</li>
+  <li>IMAP は読み取り専用（<code>readonly=True</code>）＋ <code>PEEK</code> で既読フラグを変更しない。</li>
+  <li>スコープは受信メールの読み取りのみ。送信権限は持たない。</li>
+  <li>ホストへの公開は全サービス <code>127.0.0.1</code> 限定（LAN 非公開）。</li>
+</ul>
+
+<!-- 11 -->
+<h2 id="s11">11. 制約と次の一手</h2>
+<h4>既知の制約</h4>
+<ul>
+  <li>スニペットは text/plain 優先。HTML のみのメールはテキスト抽出が簡易。</li>
+  <li>INBOX 限定・最大50件。ページング/検索条件/フォルダ指定は未実装。</li>
+  <li>本文は先頭16KBのみ（全文・添付は次フェーズ）。</li>
+  <li><code>/emails</code> は未認証（ローカル PoC 前提）。</li>
+</ul>
+<h4>次の一手（候補）</h4>
+<ul>
+  <li><b>B: LLM スコアリング</b> — <code>EmailMessage</code> を Claude に渡し <code>importance</code>/<code>task_weight</code>/<code>deadline</code>/<code>summary</code> を付与（アプリの核）。</li>
+  <li><b>C: ダッシュボード UI</b> — <code>/emails</code> を叩き「未読×高重要度＝見落とし候補」を強調表示。</li>
+  <li>本文フル取得（<code>fetch_body(uid)</code> を遅延的に追加）/ Outlook 連携 / 簡易認証。</li>
+</ul>
+
+<footer>
+  ReplyGuard 仕様書（コード全解説版）— 2026-06-08 時点の実装に基づく。
+  アーキテクチャ図解は <code>docs/architecture.html</code>、方針は <code>docs/poc-email-ingestion.md</code> を参照。
+</footer>
+
+</div>
+</body>
+</html>

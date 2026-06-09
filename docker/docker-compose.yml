@@ -1,0 +1,81 @@
+services:
+  # === API: FastAPI 本体（GET /emails ほか）===
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - path: ../secrets/gmail.env
+        required: true
+      - path: ../secrets/app.env
+        required: false
+    command:
+      ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    # 開発: プロジェクト全体をマウントしホットリロード（site-packages は影響なし）.
+    # data/ に SQLite を置くため同梱される. secrets はコンテナ自身が読む正規経路.
+    volumes:
+      - ..:/app
+    # ホスト側は loopback に限定（LAN へ公開しない）
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  # === CLI: 受信トレイを整形表示（取得経路の動作確認用）===
+  gmail-poc:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - path: ../secrets/gmail.env
+        required: true
+      - path: ../secrets/app.env
+        required: false
+    volumes:
+      - ..:/app
+    command: ["python", "-m", "app.fetch_gmail_imap"]
+    stdin_open: true
+    tty: true
+
+  # === フロント: Vite 開発サーバ（profile "frontend" / "full" で起動）===
+  # frontend/ を frontend-engineer が作成後に有効. 空のままだと npm install で失敗するため profile で隔離.
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ../frontend:/app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    environment:
+      - VITE_API_BASE=http://localhost:8000
+    ports:
+      - "127.0.0.1:5173:5173"
+    profiles: ["frontend", "full"]
+
+  # === DB: Postgres（profile "pg" / "full" で起動・既定は SQLite なので不要）===
+  db:
+    image: postgres:16-alpine
+    # 既定値は開発用. 本番では secrets/app.env で POSTGRES_PASSWORD を必ず変更する.
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-replyguard}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-replyguard}
+      - POSTGRES_DB=${POSTGRES_DB:-replyguard}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    profiles: ["pg", "full"]
+
+  # === 参考: OAuth + Gmail API 版（profile "oauth" / credentials.json が必要）===
+  gmail-poc-oauth:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ../secrets:/app/secrets
+    command: ["python", "-m", "app.fetch_gmail"]
+    stdin_open: true
+    tty: true
+    profiles: ["oauth"]
+
+volumes:
+  pgdata:

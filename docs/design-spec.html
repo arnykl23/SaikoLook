@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReplyGuard — 大枠実装 設計仕様書</title>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#f6f8fb; --panel2:#eef2f7; --border:#d8dee9; --fg:#1c2430;
+    --muted:#5a6678; --accent:#2563eb; --accent2:#0f9d58; --accent3:#7c3aed;
+    --code-bg:#f3f5f9; --warn:#b7791f; --danger:#d14343;
+    --done:#0f9d58; --stub:#7c3aed; --rough:#b7791f; --future:#8a93a8;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:"Segoe UI","Hiragino Kaku Gothic ProN","Meiryo",system-ui,sans-serif;
+    line-height:1.75;font-size:15px;}
+  .app{display:grid;grid-template-columns:268px 1fr;align-items:start;}
+  /* 目次サイドバー */
+  nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--border);
+    background:var(--panel2);padding:22px 16px 60px;font-size:13px;}
+  nav.toc .tt{font-size:12px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin:0 0 12px;}
+  nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:6px;border-left:2px solid transparent;}
+  nav.toc a:hover{color:var(--fg);background:#e3e9f2;}
+  nav.toc a.sub{padding-left:22px;font-size:12px;color:#7e879d;}
+  nav.toc .grp{margin-top:14px;}
+  .wrap{max-width:960px;margin:0 auto;padding:40px 32px 100px;}
+  header.hero{border-bottom:1px solid var(--border);padding-bottom:24px;margin-bottom:10px;}
+  h1{font-size:30px;margin:0 0 8px;letter-spacing:.02em;}
+  .sub{color:var(--muted);font-size:14px;}
+  .badges{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;}
+  .badge{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--panel);
+    border:1px solid var(--border);color:var(--muted);}
+  .badge.ok{color:var(--accent2);border-color:#a6dcbc;}
+  h2{font-size:21px;margin:48px 0 14px;padding-left:12px;border-left:3px solid var(--accent);scroll-margin-top:20px;}
+  h3{font-size:16px;margin:26px 0 8px;color:var(--accent2);scroll-margin-top:20px;}
+  h4{font-size:14px;margin:18px 0 6px;color:var(--accent3);}
+  p{margin:8px 0;} .muted{color:var(--muted);}
+  section.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin:14px 0;}
+  code{background:var(--code-bg);padding:1px 6px;border-radius:5px;
+    font-family:"Consolas","SFMono-Regular",monospace;font-size:13px;color:#0b3d91;}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;
+    padding:14px 16px;overflow-x:auto;font-size:12.5px;line-height:1.6;}
+  pre code{background:none;padding:0;color:#1c2430;}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px;}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{color:var(--muted);font-weight:600;font-size:12.5px;background:#eef2f7;}
+  tr:last-child td{border-bottom:none;}
+  ul,ol{margin:8px 0;padding-left:22px;} li{margin:4px 0;}
+  a{color:var(--accent);}
+  .note{border-left:3px solid var(--warn);background:#fdf6e7;padding:10px 14px;border-radius:6px;margin:14px 0;font-size:14px;}
+  .danger{border-left:3px solid var(--danger);background:#fdecec;padding:10px 14px;border-radius:6px;margin:14px 0;font-size:14px;}
+  .ok{border-left:3px solid var(--accent2);background:#e9f7ef;padding:10px 14px;border-radius:6px;margin:14px 0;font-size:14px;}
+  /* ステータスチップ */
+  .chip{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;vertical-align:middle;}
+  .chip.done{background:#e3f5ea;color:#0f7a43;border:1px solid #a6dcbc;}
+  .chip.stub{background:#f1e9fc;color:#6a30bf;border:1px solid #d2b9f0;}
+  .chip.rough{background:#fcf3e0;color:#946312;border:1px solid #ecd29a;}
+  .chip.future{background:#eef2f7;color:#5a6678;border:1px solid #cdd5e0;}
+  /* 概要サマリ */
+  .summary{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0 8px;}
+  .scol{border:1px solid var(--border);border-radius:12px;padding:14px 18px;background:var(--panel);}
+  .scol.now{border-top:3px solid var(--done);}
+  .scol.later{border-top:3px solid var(--stub);}
+  .scol .sh{font-weight:700;font-size:14px;margin-bottom:6px;}
+  .scol ul{margin:6px 0 2px;padding-left:20px;} .scol li{margin:5px 0;font-size:13.5px;}
+  @media (max-width:880px){.summary{grid-template-columns:1fr;}}
+  /* JPEG 厳守アーキ図 */
+  .arch{background:var(--code-bg);border:1px solid var(--border);border-radius:12px;padding:24px 20px;margin:18px 0;}
+  .arch .row{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;}
+  .arch .box{border:1px solid var(--border);border-radius:10px;padding:12px 16px;background:var(--panel);
+    min-width:150px;text-align:center;position:relative;}
+  .arch .box .t{font-weight:700;font-size:14px;}
+  .arch .box .d{color:var(--muted);font-size:11.5px;margin-top:3px;line-height:1.45;}
+  .arch .box .st{position:absolute;top:-9px;right:8px;}
+  .arch .box.bdone{border-color:#a6dcbc;}
+  .arch .box.bstub{border-color:#d2b9f0;}
+  .arch .box.brough{border-color:#ecd29a;}
+  .arch .box.bfuture{border-color:#cdd5e0;opacity:.8;}
+  .arch .box.core{min-width:340px;background:linear-gradient(180deg,#eef3fb,#f6f8fb);}
+  .arch .down{text-align:center;color:var(--accent);font-size:22px;line-height:1;margin:8px 0;}
+  .arch .side{display:flex;align-items:center;gap:14px;justify-content:center;}
+  .arch .sidebox{border:1px dashed var(--border);border-radius:10px;padding:10px 14px;background:var(--panel2);
+    min-width:130px;text-align:center;}
+  .arch .conn{color:var(--muted);font-size:18px;}
+  .arch .sublist{font-size:11px;color:var(--muted);margin-top:6px;text-align:left;display:inline-block;}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px;font-size:12px;color:var(--muted);justify-content:center;}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
+  /* mermaid */
+  .mermaid{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;padding:18px;margin:14px 0;text-align:center;}
+  .filemap{font-family:monospace;font-size:12.5px;white-space:pre;}
+  .own-mie{color:#0f7a43;} .own-lae{color:#6a30bf;} .own-be{color:#1d5fd6;}
+  .own-fe{color:#946312;} .own-arch{color:#5a6678;}
+  footer{margin-top:60px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px;}
+  .kpill{font-family:monospace;font-size:12px;background:#eef2f7;border:1px solid var(--border);border-radius:5px;padding:1px 6px;}
+  @media (max-width:880px){.app{grid-template-columns:1fr;} nav.toc{position:static;height:auto;border-right:none;border-bottom:1px solid var(--border);}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ============ 目次 ============ -->
+<nav class="toc">
+  <div class="tt">目次 / Contents</div>
+  <a href="#s0">0. このドキュメントについて</a>
+  <a href="#s1">1. 全体アーキテクチャ（JPEG厳守）</a>
+  <a href="#s2">2. システム設計の全体方針</a>
+  <a href="#s3">3. データモデル全体</a>
+  <div class="grp"></div>
+  <a href="#s4">4. 受信・正規化層（Gmail）</a>
+  <a href="#s5">5. 状態管理エンジン＋DB</a>
+  <a href="#s6">6. API層＋JWT＋LLM箱＋通知箱</a>
+  <a href="#s7">7. フロント（ラフ）</a>
+  <div class="grp"></div>
+  <a href="#s8">8. 横断リスク・エラー設計</a>
+  <a href="#s9">9. 開発エージェント分担計画</a>
+  <a href="#s10">10. 実装順序・マイルストーン</a>
+  <a href="#s11">11. 想定エラー・バグ一覧</a>
+  <a href="#s12">付録. 環境変数・構成</a>
+</nav>
+
+<!-- ============ 本体 ============ -->
+<div class="wrap">
+
+<header class="hero">
+  <h1>ReplyGuard — 大枠実装 設計仕様書</h1>
+  <div class="sub">Gmail 単独・LLM/通知は「箱」・フロントはラフ。<b>全体の骨格を一気通貫で動かす</b>ための具体設計。JPEG 全体構成を厳守。</div>
+  <div class="badges">
+    <span class="badge ok">対象: 大枠スケルトン実装</span>
+    <span class="badge">Python 3.10+ / FastAPI / pydantic v2</span>
+    <span class="badge">Vite + Vue 3</span>
+    <span class="badge">Supabase / SQLite フォールバック</span>
+    <span class="badge">2026-06-09</span>
+  </div>
+</header>
+
+<!-- ===== 概要：今/今後 ===== -->
+<section class="summary">
+  <div class="scol now">
+    <div class="sh"><span class="chip done">今回実装する</span> 一気通貫で動かす骨格</div>
+    <ul>
+      <li><b>Gmail 受信・正規化</b> — IMAP（読み取り専用）→ 共通スキーマ <code>EmailMessage</code></li>
+      <li><b>状態管理エンジン</b> — 未対応→対応中→完了の FSM＋楽観ロック＋未対応検知（対応漏れ防止の核）</li>
+      <li><b>永続化</b> — Repository 抽象（ローカル SQLite → 本番 Supabase 切替）</li>
+      <li><b>API層＋認証</b> — FastAPI（<code>GET /emails</code> 維持＋一覧/状態更新/同期）・JWT・CORS明示</li>
+      <li><b>定期取込</b> — スケジューラ（裏で取得→分析→保存→検知）</li>
+    </ul>
+  </div>
+  <div class="scol later">
+    <div class="sh"><span class="chip stub">今後に回す</span> 別途じっくり開発</div>
+    <ul>
+      <li><b>LLM 実モデル</b> — 今は差込口＋ルールベース <code>StubAnalyzer</code>。OpenAI/Claude は同契約で後日差替</li>
+      <li><b>通知の実送信</b> — 今は <code>LogNotifier</code> スタブ。Email/Slack 送信は口だけ</li>
+      <li><b>フロント作り込み</b> — 今は動作確認レベルのラフ（Vue3）。デザインは後日</li>
+      <li><b>他チャネル</b> — Slack / Outlook / GitHub は <code>MessageSource</code> 差込口のみ</li>
+      <li><b>Supabase 本番</b> — RLS・Auth 連携の詰めは骨格安定後</li>
+    </ul>
+  </div>
+</section>
+<p class="muted" style="text-align:center;margin-top:-4px">＝ <b>「箱だけ用意して中身は後で差し替え」</b>の方針。差込口（Protocol）と契約（スキーマ）を今固めることで、後の作り込みがコード結線を壊さず進む。</p>
+
+<!-- ===== 0 ===== -->
+<h2 id="s0">0. このドキュメントについて</h2>
+<section class="card">
+<p>本書は ReplyGuard の<b>「全体の大枠を一気通貫で動かす」ための実装設計</b>を定める。最初に共有された全体構成図（JPEG）の構造を<b>厳守</b>しつつ、各ブロックを今回どこまで作るかを明示する。深さ優先で書き、各層のインターフェース・データ契約・想定エラー・開発担当の分割まで含む。</p>
+
+<h3>今回のスコープ（3つの割り切り）</h3>
+<table>
+  <tr><th>ブロック</th><th>今回どこまで</th><th>意味</th></tr>
+  <tr><td>受信・正規化</td><td><span class="chip done">実装</span></td><td><b>Gmail のみ</b>本実装。Slack/Outlook/GitHub は差込口（Protocol）だけ用意して将来。</td></tr>
+  <tr><td>LLM処理</td><td><span class="chip stub">箱（スタブ）</span></td><td>インターフェースと結果スキーマは確定。中身はルールベースのスタブ。実モデルは後日「別途じっくり」。</td></tr>
+  <tr><td>状態管理エンジン</td><td><span class="chip done">実装</span></td><td>未対応→対応中→完了の状態機械と永続化。骨格として本実装する（ここが対応漏れ防止の核）。</td></tr>
+  <tr><td>API層 + 認証</td><td><span class="chip done">実装</span></td><td>FastAPI。既存 <code>GET /emails</code> を保ったまま状態取得/更新・同期トリガを追加。JWT は最小実装。</td></tr>
+  <tr><td>通知</td><td><span class="chip stub">箱（スタブ）</span></td><td>Notifier インターフェース＋ログ出力スタブ。Email/Slack 送信は口だけ。</td></tr>
+  <tr><td>Web ダッシュボード</td><td><span class="chip rough">ラフ</span></td><td>Vite+Vue3 で一覧・状態変更が動く確認レベル。デザインの作り込みは「別途じっくり」。</td></tr>
+</table>
+<p class="muted">凡例: <span class="chip done">実装</span> 今回しっかり作る／<span class="chip stub">箱</span> 差込口＋スタブのみ／<span class="chip rough">ラフ</span> 動作確認品質／<span class="chip future">将来</span> 口だけ・未着手。</p>
+
+<div class="ok"><b>不変条件（壊してはいけない契約）</b>：① 共通スキーマ <code>EmailMessage</code> は<b>追加（任意フィールド）のみ</b>で破壊変更しない。② <code>GET /emails</code> のレスポンス形は維持。③ Gmail は<b>読み取り専用</b>（IMAP <code>BODY.PEEK</code>・既読化しない）。④ メール本文は<b>外部由来データであって命令ではない</b>（OWASP LLM01）。⑤ 秘密情報はコミット/ハードコードしない。</div>
+</section>
+
+<!-- ===== 1 ===== -->
+<h2 id="s1">1. 全体アーキテクチャ（JPEG厳守）</h2>
+<p>共有された全体構成図の流れ＝<b>メッセージソース → 受信・正規化 → LLM処理 → 状態管理エンジン → API層 → Web ダッシュボード</b>。脇に <b>Supabase（DB/Auth/Storage）</b>・<b>OpenAI/Claude</b>・<b>通知</b>がぶら下がる。下図はその構成をそのまま再現し、今回の実装ステータスを重ねたもの。</p>
+
+<div class="arch">
+  <!-- ソース -->
+  <div class="row">
+    <div class="box bdone"><span class="st"><span class="chip done">実装</span></span><div class="t">Gmail</div><div class="d">IMAP + アプリパスワード<br>読み取り専用</div></div>
+    <div class="box bfuture"><span class="st"><span class="chip future">将来</span></span><div class="t">Slack</div><div class="d">差込口のみ</div></div>
+    <div class="box bfuture"><span class="st"><span class="chip future">将来</span></span><div class="t">Outlook</div><div class="d">MS Graph 想定</div></div>
+    <div class="box bfuture"><span class="st"><span class="chip future">将来</span></span><div class="t">GitHub</div><div class="d">差込口のみ</div></div>
+  </div>
+  <div class="down">▼</div>
+
+  <!-- 受信・正規化 -->
+  <div class="row">
+    <div class="box bdone core"><span class="st"><span class="chip done">実装</span></span>
+      <div class="t">受信・正規化層</div>
+      <div class="d">各ソースの差を吸収し共通スキーマ <code>EmailMessage</code> へ。<code>MessageSource</code> Protocol で抽象化。Gmail のみ実装。</div>
+    </div>
+  </div>
+  <div class="down">▼</div>
+
+  <!-- LLM処理 + OpenAI 横 -->
+  <div class="side">
+    <div class="box bstub core"><span class="st"><span class="chip stub">箱</span></span>
+      <div class="t">LLM処理</div>
+      <div class="d">入力 <code>EmailMessage</code> → 分析結果 <code>AnalysisResult</code>。<code>Analyzer</code> Protocol。今回はルールベースの <code>StubAnalyzer</code>。</div>
+      <div class="sublist">・要約生成　・分類（category）<br>・重要度判定（importance 1–5）<br>・対応要否判定（needs_reply）<br>・理由生成（reason）</div>
+    </div>
+    <div class="conn">⇄</div>
+    <div class="sidebox"><span class="chip future">口だけ</span><div class="t" style="margin-top:4px">OpenAI / Claude</div><div class="d" style="color:var(--muted);font-size:11px">実モデルは後日差替</div></div>
+  </div>
+  <div class="down">▼</div>
+
+  <!-- 状態管理 + Supabase/通知 横 -->
+  <div class="side">
+    <div class="box bdone core"><span class="st"><span class="chip done">実装</span></span>
+      <div class="t">状態管理エンジン</div>
+      <div class="d">メールを永続化し対応状態を管理。FSM（未対応→対応中→完了/スヌーズ/対象外）＋楽観ロック。未対応検知（未読×高重要度×経過時間）。</div>
+    </div>
+    <div class="conn">⇄</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="sidebox"><span class="chip done">実装</span><div class="t" style="margin-top:4px">Supabase</div><div class="d" style="font-size:11px">PostgreSQL / Auth / Storage<br>※ ローカルは SQLite フォールバック</div></div>
+      <div class="sidebox"><span class="chip stub">箱</span><div class="t" style="margin-top:4px">通知</div><div class="d" style="font-size:11px">Notifier Protocol<br>Log スタブ（Email/Slack 口だけ）</div></div>
+    </div>
+  </div>
+  <div class="down">▼</div>
+
+  <!-- API層 -->
+  <div class="row">
+    <div class="box bdone core"><span class="st"><span class="chip done">実装</span></span>
+      <div class="t">API層（FastAPI）</div>
+      <div class="d"><code>GET /emails</code>（維持）＋ 状態取得/更新・同期トリガ・分析結果取得。<b>JWT 認証</b>（Supabase Auth 本命 / PyJWT 最小実装）。CORS は許可 origin 明示。</div>
+    </div>
+  </div>
+  <div class="down">▼</div>
+
+  <!-- フロント -->
+  <div class="row">
+    <div class="box brough core"><span class="st"><span class="chip rough">ラフ</span></span>
+      <div class="t">Web ダッシュボード</div>
+      <div class="d">Vite + Vue 3。受信トレイ一覧・未対応フィルタ・状態変更が動く確認レベル。デザイン作り込みは後日。</div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:#36c692"></span>実装（今回しっかり）</span>
+    <span><span class="dot" style="background:#c08cff"></span>箱（差込口＋スタブ）</span>
+    <span><span class="dot" style="background:#f0a73f"></span>ラフ（動作確認品質）</span>
+    <span><span class="dot" style="background:#5a6072"></span>将来（口だけ）</span>
+  </div>
+</div>
+
+<h3>JPEG ブロック ↔ 実装モジュール 対応表</h3>
+<table>
+  <tr><th>JPEG のブロック</th><th>担当モジュール（予定）</th><th>状態</th></tr>
+  <tr><td>メッセージソース（Gmail）</td><td><code>app/adapters/gmail/*</code>（既存 <code>fetch_gmail_imap.py</code> を移設）</td><td><span class="chip done">実装</span></td></tr>
+  <tr><td>受信・正規化</td><td><code>app/adapters/sources/</code>＋<code>MessageSource</code> Protocol（<code>app/ports/</code>）</td><td><span class="chip done">実装</span></td></tr>
+  <tr><td>LLM処理</td><td><code>app/analysis/</code>（<code>Analyzer</code> Protocol＋<code>StubAnalyzer</code>）</td><td><span class="chip stub">箱</span></td></tr>
+  <tr><td>状態管理エンジン</td><td><code>app/domain/</code>（FSM）＋<code>app/services/ingestion.py</code></td><td><span class="chip done">実装</span></td></tr>
+  <tr><td>DB（Supabase）</td><td><code>app/repositories/</code>（Repository Protocol＋SQLAlchemy 実装）</td><td><span class="chip done">実装</span></td></tr>
+  <tr><td>通知</td><td><code>app/notify/</code>（<code>Notifier</code> Protocol＋<code>LogNotifier</code>）</td><td><span class="chip stub">箱</span></td></tr>
+  <tr><td>API層</td><td><code>app/main.py</code>＋<code>app/api/routers/</code>＋<code>app/api/deps.py</code>（JWT）</td><td><span class="chip done">実装</span></td></tr>
+  <tr><td>Web ダッシュボード</td><td><code>frontend/</code>（Vite+Vue3）</td><td><span class="chip rough">ラフ</span></td></tr>
+</table>
+
+<!-- ===== 2 ===== -->
+<h2 id="s2">2. システム設計の全体方針</h2>
+
+<h3>2.1 レイヤリング（ヘキサゴナル / ポート＆アダプタ）</h3>
+<p>差し替えたい部分（メールソース・LLM・DB・通知）を<b>すべて Protocol（ポート）で抽象化</b>し、具体実装（アダプタ）を後から差し替え可能にする。依存方向は常に<b>内向き</b>（アダプタ→サービス→ドメイン）。ドメインは外部技術を知らない。</p>
+
+<div class="mermaid">
+flowchart TB
+  subgraph API["API層 (driving adapter)"]
+    R["routers / deps(JWT)"]
+  end
+  subgraph SVC["アプリケーションサービス"]
+    ING["IngestionService\n取得→分析→永続化→検知"]
+    QRY["QueryService / StateService"]
+  end
+  subgraph DOM["ドメイン (核・外部非依存)"]
+    FSM["状態機械 / 未対応検知ルール"]
+    MDL["EmailMessage / AnalysisResult / MessageRecord"]
+  end
+  subgraph PORTS["ポート (Protocol)"]
+    P1["MessageSource"]
+    P2["Analyzer"]
+    P3["Repository"]
+    P4["Notifier"]
+  end
+  subgraph ADP["アダプタ (driven)"]
+    A1["GmailImapSource"]
+    A2["StubAnalyzer / (OpenAI)"]
+    A3["SqlRepository (PG/SQLite)"]
+    A4["LogNotifier / (Email/Slack)"]
+  end
+  R --> SVC --> DOM
+  SVC --> PORTS
+  P1 -.実装.-> A1
+  P2 -.実装.-> A2
+  P3 -.実装.-> A3
+  P4 -.実装.-> A4
+</div>
+
+<h3>2.2 ディレクトリ構成（提案）</h3>
+<section class="card">
+<pre class="filemap"><code>app/
+├── main.py                  API起動・ルータ登録・CORS・lifespan(スケジューラ起動)
+├── config.py                設定(env読込・pydantic-settings)
+├── models.py                EmailMessage(既存・拡張) ＋ 分析/状態スキーマ
+├── ports/                   ★ Protocol 定義（差し替え境界）
+│   ├── source.py            MessageSource
+│   ├── analyzer.py          Analyzer
+│   ├── repository.py        Repository
+│   └── notifier.py          Notifier
+├── domain/
+│   ├── state.py             FSM(状態遷移ルール)・許可遷移表
+│   └── triage.py            未対応検知スコアリング
+├── adapters/sources/
+│   ├── gmail_imap.py        ← 既存 fetch_gmail_imap.py を移設(読み取り専用維持)
+│   └── gmail_oauth.py       予備(既存 fetch_gmail.py)
+├── analysis/
+│   ├── stub.py              StubAnalyzer(ルールベース)
+│   └── prompt.py            実モデル用プロンプト雛形(口だけ)
+├── repositories/
+│   ├── sql.py               SQLAlchemy 実装(PG/SQLite両対応)
+│   └── memory.py            テスト用インメモリ
+├── notify/
+│   └── log.py               LogNotifier(スタブ)
+├── services/
+│   ├── ingestion.py         取得→分析→保存→検知→通知 の調整役
+│   └── state_service.py     状態取得/更新(楽観ロック)
+├── api/
+│   ├── deps.py              get_current_user(JWT検証)・get_repo 等のDI
+│   └── routers/
+│       ├── emails.py        GET /emails(維持) / GET /messages / detail
+│       ├── state.py         PATCH /messages/{id}/state
+│       └── sync.py          POST /sync(手動同期トリガ)
+└── scheduler.py             APScheduler(定期取込)
+frontend/                    Vite + Vue 3(ラフ)
+migrations/                  Alembic
+</code></pre>
+</section>
+<p class="muted">既存 <code>fetch_gmail_imap.py</code> / <code>models.py</code> / <code>main.py</code> は壊さず移設・拡張する。<code>GET /emails</code> は <code>emails.py</code> ルータで現行同等の応答を維持。</p>
+
+<h3>2.3 2つのデータ経路（取込は非同期・読み出しは同期）</h3>
+<p>Gmail への IMAP 取得は遅く詰まりうるので、<b>HTTP リクエストの同期処理から切り離す</b>。取込はスケジューラ（または <code>POST /sync</code>）が裏で回し、フロントは<b>DB を読むだけ</b>。これにより一覧表示が IMAP の遅延・失敗に巻き込まれない。</p>
+<div class="mermaid">
+flowchart LR
+  subgraph 取込["取込経路 (非同期・裏)"]
+    SCH["Scheduler / POST /sync"] --> ING["IngestionService"]
+    ING --> SRC["GmailImapSource"]
+    ING --> ANA["StubAnalyzer"]
+    ING --> REP1["Repository.upsert"]
+    ING --> NTF["Notifier(未対応検知時)"]
+  end
+  subgraph 読出["読み出し経路 (同期・速い)"]
+    FE["フロント"] --> APIr["GET /messages"]
+    APIr --> REP2["Repository.query"]
+  end
+  REP1 --> DB[("DB")]
+  REP2 --> DB
+</div>
+
+<!-- ===== 3 ===== -->
+<h2 id="s3">3. データモデル全体</h2>
+<p>層間の契約は3つ：取得層が作る <code>EmailMessage</code>、LLM箱が返す <code>AnalysisResult</code>、状態管理が永続化する <code>MessageRecord</code>。<b><code>EmailMessage</code> は破壊変更せず任意フィールド追加のみ</b>。</p>
+
+<h3>3.1 スキーマ（pydantic v2）</h3>
+<pre><code># app/models.py（既存を拡張：既存フィールドはそのまま、任意追加のみ）
+class EmailMessage(BaseModel):
+    id: str                       # IMAP UID（プロバイダ内安定ID）
+    provider: str = "gmail"
+    subject: str = ""
+    sender: str = ""
+    to: list[str] = []
+    received_at: datetime | None = None
+    snippet: str = ""
+    is_unread: bool = False
+    body_text: str | None = None  # ★追加(任意)：LLM入力用。取得層が先頭のみ詰める
+
+class AnalysisResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")   # LLM出力の余計なキーを弾く
+    importance: int = Field(ge=1, le=5)          # 重要度 1–5
+    needs_reply: bool                            # 対応要否
+    task_weight: Literal["light","medium","heavy"]
+    category: str                                # 分類ラベル
+    summary: str                                 # 要約
+    suggested_action: str | None = None
+    deadline: datetime | None = None
+    reason: str                                  # 判定理由（説明可能性）
+    analyzer: str = "stub"                       # どの実装が出したか
+
+class MessageState(str, Enum):
+    UNHANDLED="unhandled"; IN_PROGRESS="in_progress"
+    DONE="done"; SNOOZED="snoozed"; DISMISSED="dismissed"
+
+class MessageRecord(BaseModel):       # 永続化の単位（EmailMessage＋分析＋状態）
+    message_id: str                   # 安定ID = f"{provider}:{id}"
+    email: EmailMessage
+    analysis: AnalysisResult | None = None
+    state: MessageState = MessageState.UNHANDLED
+    triage_score: float = 0.0         # 未対応検知スコア
+    version: int = 0                  # 楽観ロック用
+    created_at: datetime; updated_at: datetime
+</code></pre>
+
+<h3>3.2 ER 図（永続化）</h3>
+<div class="mermaid">
+erDiagram
+  MESSAGES ||--o| ANALYSES : has
+  MESSAGES ||--o{ STATE_EVENTS : logs
+  MESSAGES {
+    text message_id PK "provider:id"
+    text provider
+    text subject
+    text sender
+    timestamptz received_at
+    bool is_unread
+    text state "unhandled|in_progress|done|snoozed|dismissed"
+    float triage_score
+    int version "楽観ロック"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  ANALYSES {
+    text message_id FK
+    int importance
+    bool needs_reply
+    text task_weight
+    text category
+    text summary
+    text reason
+    text analyzer
+  }
+  STATE_EVENTS {
+    bigint id PK
+    text message_id FK
+    text from_state
+    text to_state
+    text actor
+    timestamptz at
+  }
+  SYNC_STATE {
+    text account PK
+    int uidvalidity
+    int last_uid
+    timestamptz last_synced_at
+  }
+</div>
+<p class="muted"><code>STATE_EVENTS</code> は監査ログ（誰がいつ状態を変えたか）。<code>SYNC_STATE</code> は IMAP の差分取得用（後述）。Supabase 上では <code>MESSAGES</code> に RLS を掛けてユーザー分離する。</p>
+
+<!-- ===== 4 ===== -->
+<h2 id="s4">4. 受信・正規化層（Gmail）</h2>
+<p>既存の <code>fetch_gmail_imap.py</code>（読み取り専用・<code>BODY.PEEK</code>・UID・timeout・件数/バイト上限）を<b>そのまま核に</b>、ソース差し替えの口 <code>MessageSource</code> を被せる。Slack/Outlook/GitHub は同じ Protocol の別実装として将来追加。</p>
+
+<h3>4.1 ポート定義</h3>
+<pre><code># app/ports/source.py
+class MessageSource(Protocol):
+    provider: str
+    def list_recent(self, limit: int) -> list[EmailMessage]: ...
+    def fetch_since(self, state: SyncState, limit: int) -> FetchResult: ...
+    def close(self) -> None: ...
+
+@dataclass
+class SyncState:           # アカウント単位の取得位置（差分取得の鍵）
+    account: str
+    uidvalidity: int | None = None
+    last_uid: int | None = None
+
+@dataclass
+class FetchResult:
+    messages: list[EmailMessage]
+    new_state: SyncState
+    truncated: bool        # 上限で打ち切ったか
+</code></pre>
+
+<h3>4.2 差分取得（UID / UIDVALIDITY）</h3>
+<p>毎回末尾 N 件を取り直すのは無駄が多く取りこぼしも出る。IMAP の <b>UID は INBOX 内で単調増加</b>するので、<code>last_uid</code> より新しい UID だけを取る。<code>UIDVALIDITY</code> が変わったら UID 空間がリセットされた合図なので、保存済み UID を破棄して取り直す。</p>
+<div class="mermaid">
+sequenceDiagram
+  participant S as IngestionService
+  participant G as GmailImapSource
+  participant I as IMAP(gmail)
+  S->>G: fetch_since(SyncState{uidvalidity,last_uid})
+  G->>I: login + SELECT INBOX (readonly)
+  I-->>G: UIDVALIDITY, EXISTS
+  alt UIDVALIDITY 変化
+    G->>G: last_uid を破棄(全UID空間が変わった)
+  end
+  G->>I: UID SEARCH UID (last_uid+1):*
+  I-->>G: 新着UIDリスト
+  G->>I: UID FETCH ... (UID FLAGS BODY.PEEK[]<0.16384>)
+  I-->>G: ヘッダ＋本文先頭(既読化しない)
+  G->>G: decode/正規化 → EmailMessage[]
+  G-->>S: FetchResult(messages, new_state{last_uid=max})
+</div>
+
+<h3>4.3 正規化で守ること</h3>
+<ul>
+  <li>MIME ヘッダのデコード（<code>decode_header</code>/<code>make_header</code>）。失敗時は生値フォールバック。</li>
+  <li>本文は <code>text/plain</code> 優先抽出。HTML のみのメールはテキスト化（<code>BeautifulSoup</code> 等）。<code>body_text</code> は<b>先頭 N 文字のみ</b>（巨大本文を抱えない）。</li>
+  <li>差出人/宛先の整形、日時パース（失敗は <code>None</code>＋ログ）。</li>
+  <li>安定ID＝<code>f"{provider}:{uid}"</code> で全層一致させる。</li>
+</ul>
+<div class="danger"><b>セキュリティ厳守</b>：送信・書込みスコープは要求しない。<code>BODY.PEEK</code> で既読化しない。全件 SEARCH や本文全文取得をしない（件数・バイト・timeout 上限を維持）。資格情報を例外メッセージ・ログに混ぜない。</div>
+
+<h3>4.4 想定エラー（取得層）</h3>
+<table>
+  <tr><th>事象</th><th>原因</th><th>設計上の扱い</th></tr>
+  <tr><td>ログイン失敗</td><td>アプリパスワード誤り/2段階未設定</td><td>資格情報を伏せた <code>RuntimeError</code>。同期は失敗ログのみ（一覧APIは前回分を返し続ける）。</td></tr>
+  <tr><td>接続タイムアウト</td><td>ネットワーク/Gmail側</td><td><code>IMAP_TIMEOUT</code> で打ち切り→リトライ（指数バックオフ、上限あり）。</td></tr>
+  <tr><td>UIDVALIDITY 変化</td><td>メールボックス再構成</td><td><code>last_uid</code> 破棄して再取得。重複は upsert で吸収。</td></tr>
+  <tr><td>デコード不能ヘッダ</td><td>壊れた MIME</td><td>握りつぶさず生値＋警告ログ。1通の失敗で全体を落とさない。</td></tr>
+  <tr><td>巨大メール</td><td>添付過多</td><td>先頭 16KB のみ取得済み。本文は <code>body_text</code> 上限で切り詰め。</td></tr>
+</table>
+
+<!-- ===== 5 ===== -->
+<h2 id="s5">5. 状態管理エンジン＋DB</h2>
+<p>対応漏れ防止の核。各メッセージは<b>有限状態機械</b>で管理し、状態遷移は許可表で検証、更新は<b>楽観ロック</b>で競合を防ぐ。永続化は <code>Repository</code> Protocol で抽象化し、Supabase(PostgreSQL) 本命・ローカル SQLite フォールバックを同契約で切替える。</p>
+
+<h3>5.1 状態遷移（FSM）</h3>
+<div class="mermaid">
+stateDiagram-v2
+  [*] --> unhandled: 取込
+  unhandled --> in_progress: 着手
+  unhandled --> dismissed: 対象外
+  unhandled --> snoozed: スヌーズ
+  in_progress --> done: 完了
+  in_progress --> unhandled: 差し戻し
+  snoozed --> unhandled: 期限到来
+  done --> in_progress: 再オープン
+  dismissed --> unhandled: 復帰
+</div>
+<pre><code># app/domain/state.py — 許可遷移のみ通す（不正遷移は弾く）
+ALLOWED = {
+  UNHANDLED: {IN_PROGRESS, DISMISSED, SNOOZED},
+  IN_PROGRESS:{DONE, UNHANDLED},
+  SNOOZED:   {UNHANDLED},
+  DONE:      {IN_PROGRESS},
+  DISMISSED: {UNHANDLED},
+}
+def can_transition(cur, nxt) -> bool: return nxt in ALLOWED.get(cur, set())
+</code></pre>
+
+<h3>5.2 楽観ロック（競合更新の防止）</h3>
+<p>2人が同じメールの状態を同時に変えると後勝ちで履歴が壊れる。<code>version</code> 列を使い <code>UPDATE ... WHERE message_id=? AND version=?</code>。0 行更新なら競合として <b>409 Conflict</b> を返し、フロントは再取得を促す。</p>
+<div class="mermaid">
+sequenceDiagram
+  participant U1 as 利用者A
+  participant U2 as 利用者B
+  participant API
+  participant DB
+  U1->>API: PATCH state (version=3)
+  API->>DB: UPDATE ... WHERE version=3
+  DB-->>API: 1 row → version=4
+  API-->>U1: 200 OK
+  U2->>API: PATCH state (version=3 ※古い)
+  API->>DB: UPDATE ... WHERE version=3
+  DB-->>API: 0 row
+  API-->>U2: 409 Conflict (再取得して)
+</div>
+
+<h3>5.3 未対応検知スコアリング</h3>
+<p>「未読 × 高重要度 × 経過時間」で <code>triage_score</code> を算出し、ダッシュボードの並べ替えと通知判定に使う。ルールはドメインに置き、LLM の有無に依存しない（スタブでも動く）。</p>
+<pre><code># app/domain/triage.py（例：重み付け・要調整）
+score = (importance_weight[a.importance]      # 重要度 1–5 → 重み
+         + (2.0 if email.is_unread else 0)
+         + age_hours(email.received_at) * 0.1
+         + (3.0 if a.needs_reply else 0))
+</code></pre>
+
+<h3>5.4 Repository 抽象と永続化の切替</h3>
+<pre><code># app/ports/repository.py
+class Repository(Protocol):
+    def upsert_messages(self, recs: list[MessageRecord]) -> None: ...
+    def get(self, message_id: str) -> MessageRecord | None: ...
+    def query(self, *, state: MessageState|None, order_by_score: bool,
+              limit: int, offset: int) -> list[MessageRecord]: ...
+    def update_state(self, message_id: str, to: MessageState,
+                     expected_version: int, actor: str) -> MessageRecord: ...  # 0行→Conflict
+    def get_sync_state(self, account: str) -> SyncState: ...
+    def save_sync_state(self, st: SyncState) -> None: ...
+</code></pre>
+<table>
+  <tr><th>環境</th><th>実装</th><th>接続</th></tr>
+  <tr><td>本命（クラウド）</td><td><code>SqlRepository</code> + PostgreSQL</td><td>Supabase。<code>MESSAGES</code> に RLS でユーザー分離。SQLAlchemy 2.0 + asyncpg。</td></tr>
+  <tr><td>ローカル/PoC</td><td>同 <code>SqlRepository</code> + SQLite</td><td>aiosqlite。スキーマは Alembic で共通管理。</td></tr>
+  <tr><td>テスト</td><td><code>MemoryRepository</code></td><td>インメモリ。決定的ユニットテスト用。</td></tr>
+</table>
+<p class="muted">DB 選定は <code>supabase-py</code> ではなく <b>SQLAlchemy</b> を推奨：フォールバック(PG/SQLite)とトランザクション・楽観ロックを同一コードで扱えるため。</p>
+
+<h3>5.5 想定エラー（状態管理）</h3>
+<table>
+  <tr><th>事象</th><th>扱い</th></tr>
+  <tr><td>不正な状態遷移</td><td><code>can_transition</code> で 422。許可表外は拒否。</td></tr>
+  <tr><td>版ずれ（同時更新）</td><td>409 Conflict＋最新版を返す。</td></tr>
+  <tr><td>取込の重複</td><td><code>message_id</code> 一意で upsert。状態は保持（再取込で <code>done</code> を <code>unhandled</code> に戻さない）。</td></tr>
+  <tr><td>DB 接続断</td><td>取込はリトライ、読み出しAPIは 503。秘密情報を含めない。</td></tr>
+</table>
+
+<!-- ===== 6 ===== -->
+<h2 id="s6">6. API層＋JWT＋LLM箱＋通知箱</h2>
+
+<h3>6.1 エンドポイント</h3>
+<table>
+  <tr><th>メソッド/パス</th><th>説明</th><th>認証</th><th>状態</th></tr>
+  <tr><td><code>GET /health</code></td><td>死活</td><td>不要</td><td><span class="chip done">維持</span></td></tr>
+  <tr><td><code>GET /emails?limit=</code></td><td>既存：Gmail から直接取得して返す（現行互換）</td><td>最小</td><td><span class="chip done">維持</span></td></tr>
+  <tr><td><code>GET /messages</code></td><td>DB から状態付きで一覧（state/score でフィルタ・ソート・ページング）</td><td>必須</td><td><span class="chip done">新規</span></td></tr>
+  <tr><td><code>GET /messages/{id}</code></td><td>1件詳細（分析結果・履歴含む）</td><td>必須</td><td><span class="chip done">新規</span></td></tr>
+  <tr><td><code>PATCH /messages/{id}/state</code></td><td>状態変更（楽観ロック・version 必須）</td><td>必須</td><td><span class="chip done">新規</span></td></tr>
+  <tr><td><code>POST /sync</code></td><td>手動同期トリガ（裏で取込キック）</td><td>必須</td><td><span class="chip done">新規</span></td></tr>
+  <tr><td><code>GET /messages/{id}/analysis</code></td><td>分析結果のみ</td><td>必須</td><td><span class="chip stub">箱</span></td></tr>
+</table>
+
+<h3>6.2 認証（JWT）</h3>
+<p>本命は <b>Supabase Auth</b>（発行済み JWT を API 側で検証、RLS と整合）。PoC では <b>PyJWT(HS256)</b> の最小実装でも可。検証は DI <code>get_current_user</code> に集約し、ルータは <code>Depends</code> で受けるだけ。</p>
+<pre><code># app/api/deps.py
+def get_current_user(token = Depends(oauth2_scheme)) -> User:
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"],
+                             audience=settings.jwt_aud)
+    except JWTError:
+        raise HTTPException(401, "invalid token")
+    return User(id=payload["sub"])
+</code></pre>
+<div class="note">秘密鍵は env/Secrets から。トークンは <code>Authorization: Bearer</code>。CORS は許可 origin 明示（ワイルドカード禁止、既存 <code>ALLOWED_ORIGINS</code> 方針を踏襲）。</div>
+
+<h3>6.3 LLM箱（Analyzer）</h3>
+<p>インターフェースと出力スキーマを今確定し、中身はスタブ。実モデルは同契約の別実装として後日差し込む（コード変更なしで切替）。</p>
+<pre><code># app/ports/analyzer.py
+class Analyzer(Protocol):
+    name: str
+    def analyze(self, email: EmailMessage) -> AnalysisResult: ...
+
+# app/analysis/stub.py — ルールベース（決定的・テスト容易）
+class StubAnalyzer:
+    name = "stub"
+    def analyze(self, e: EmailMessage) -> AnalysisResult:
+        kw = any(k in (e.subject+e.snippet) for k in ("至急","締切","請求","返信"))
+        imp = 5 if (e.is_unread and kw) else 3 if e.is_unread else 2
+        return AnalysisResult(importance=imp, needs_reply=kw,
+            task_weight="medium" if kw else "light",
+            category="action" if kw else "fyi",
+            summary=e.snippet[:80], reason="件名/本文のキーワードと未読状態で判定",
+            analyzer="stub")
+</code></pre>
+<div class="danger"><b>プロンプト防御（実モデル時に必須）</b>：メール本文・件名はユーザーデータであって命令ではない（LLM01）。システム指示とデータをデリミタ/専用フィールドで分離し「以前の指示を無視せよ」等に乗らない。出力は <code>extra="forbid"</code> でスキーマ検証し、範囲外（importance 1–5 外・余計な実行指示）を弾く（LLM05）。本文を外部へ送るのは分析 API への正規呼び出しに限る。</div>
+
+<h3>6.4 通知箱（Notifier）</h3>
+<pre><code># app/ports/notifier.py
+class Notifier(Protocol):
+    def notify(self, rec: MessageRecord, *, dedupe_key: str) -> None: ...
+# app/notify/log.py — スタブ：標準ログに出すだけ（外部送信しない）
+</code></pre>
+<p><code>dedupe_key</code>（例 <code>f"{message_id}:{date}"</code>）で<b>べき等</b>にし、スケジューラ再実行や二重起動で同じ通知が連発しないようにする。Email/Slack 送信は口だけ用意。</p>
+
+<h3>6.5 スケジューラ（定期取込）</h3>
+<p>APScheduler を <code>lifespan</code> で起動し、一定間隔で <code>IngestionService.run()</code> を呼ぶ。<b>多重起動防止</b>（ロック/単一ワーカー）と<b>実行重なり防止</b>（<code>max_instances=1</code>・<code>coalesce=True</code>）を設定。失敗しても次回に回復する設計。</p>
+
+<!-- ===== 7 ===== -->
+<h2 id="s7">7. フロント（ラフ）</h2>
+<p>確認できる品質で十分。<b>Vite + Vue 3</b> を推奨（単一 HTML より CORS・将来移行が楽）。API クライアント層・composable で状態管理を薄く分離し、後の作り込みに耐える土台だけ作る。</p>
+
+<h3>7.1 画面構成（ワイヤー）</h3>
+<div class="mermaid">
+flowchart TB
+  subgraph 画面["ダッシュボード(1画面)"]
+    H["ヘッダ: 同期ボタン / 未対応フィルタ"]
+    L["メッセージ一覧(triage_score 降順)"]
+    L --> ROW["行: 重要度バッジ・差出人・件名・状態・経過時間"]
+    D["詳細ペイン: 要約・理由・状態変更ボタン"]
+  end
+  ROW -->|選択| D
+</div>
+
+<h3>7.2 構成</h3>
+<pre><code>frontend/
+├── src/
+│   ├── api/client.ts        fetchラッパ(Bearer付与・エラー整形)
+│   ├── composables/useMessages.ts   一覧取得・状態更新・409再取得
+│   ├── components/MessageList.vue / MessageRow.vue / DetailPane.vue
+│   └── App.vue / main.ts
+└── vite.config.ts           dev proxy → API(8000)
+</code></pre>
+<ul>
+  <li>一覧は <code>GET /messages</code>、状態変更は <code>PATCH .../state</code>（<code>version</code> を送り 409 なら再取得）。</li>
+  <li>表示テキストは<b>本文をそのまま信用せず</b>、HTML 描画する場合は <code>DOMPurify</code> 等でサニタイズ（メール本文由来の XSS 対策）。</li>
+  <li>色は状態・重要度の識別だけに使う（DESIGN.md §0「管制塔」方針：赤の濫用をしない・light 基調）。</li>
+</ul>
+
+<!-- ===== 8 ===== -->
+<h2 id="s8">8. 横断リスク・エラー設計</h2>
+<p>層をまたぐリスクと、その防御をまとめる。実装時は各担当がこの表を満たすこと。</p>
+
+<h3>8.1 セキュリティ横断</h3>
+<table>
+  <tr><th>リスク</th><th>該当層</th><th>防御</th></tr>
+  <tr><td>プロンプトインジェクション（LLM01）</td><td>取得・LLM</td><td>本文＝データとして扱い指示分離。本文中の命令文に従わない。検知時は処理継続せず記録。</td></tr>
+  <tr><td>LLM 出力の不正利用（LLM05）</td><td>LLM・状態</td><td><code>extra="forbid"</code>＋範囲検証。出力をシェル/SQL/eval に渡さない。failで既定値フォールバック。</td></tr>
+  <tr><td>秘密情報の漏洩</td><td>全層</td><td>env/Secrets から読む。コミット禁止（<code>secrets/</code>・<code>token_*.json</code>・<code>*.env</code>）。例外/ログに資格情報を混ぜない。<code>*.env.example</code> のみ可。</td></tr>
+  <tr><td>既読化の副作用</td><td>取得</td><td><code>BODY.PEEK</code>・<code>readonly=True</code> 維持。書込みスコープ要求禁止。</td></tr>
+  <tr><td>CORS 経由の情報読取</td><td>API</td><td>許可 origin 明示・ワイルドカード禁止（現行方針踏襲）。</td></tr>
+  <tr><td>XSS（メール本文）</td><td>フロント</td><td>HTML 描画は DOMPurify。既定はテキスト表示。</td></tr>
+  <tr><td>認証バイパス</td><td>API</td><td>状態変更系は <code>get_current_user</code> 必須。Supabase は RLS でユーザー分離。</td></tr>
+  <tr><td>外部送信</td><td>全層</td><td>PC内情報・本文・パスを外部送信しない（分析 API への正規呼び出しを除く）。</td></tr>
+</table>
+
+<h3>8.2 堅牢性・運用横断</h3>
+<table>
+  <tr><th>リスク</th><th>防御</th></tr>
+  <tr><td>IMAP の遅延でAPIが詰まる</td><td>取込を非同期化（§2.3）。読み出しはDBのみ。各IMAP操作に timeout。</td></tr>
+  <tr><td>同時状態更新の競合</td><td>楽観ロック（version）＋409。</td></tr>
+  <tr><td>取込・通知の二重実行</td><td>スケジューラ <code>max_instances=1</code>/<code>coalesce</code>＋通知 <code>dedupe_key</code> でべき等。</td></tr>
+  <tr><td>再取込で状態巻き戻り</td><td>upsert はメール本体のみ更新し <code>state</code> は保持。</td></tr>
+  <tr><td>LLM コスト/レート</td><td>本文を要約/切詰めて渡す・timeout・リトライ・上限（実モデル時）。</td></tr>
+  <tr><td>部分失敗</td><td>1通の失敗で全体を止めない。失敗は記録し次回回復。</td></tr>
+</table>
+
+<!-- ===== 9 ===== -->
+<h2 id="s9">9. 開発エージェント分担計画</h2>
+<p>ファイル所有が<b>重ならない</b>よう層で分割し、契約（Protocol・スキーマ）を先に固めてから並列実装する。司令塔（メイン）が <code>ports/</code> と <code>models.py</code> を先行確定 → 各担当が自分のアダプタを並列実装、の順。</p>
+
+<h3>9.1 担当 ↔ ファイル所有マップ</h3>
+<section class="card">
+<pre class="filemap"><code>app/
+├── <span class="own-arch">ports/            ……… 司令塔/architect（契約を最初に確定）</span>
+├── <span class="own-arch">models.py         ……… 司令塔/architect（スキーマ拡張）</span>
+├── <span class="own-mie">adapters/sources/ ……… mail-ingestion-engineer</span>
+├── <span class="own-lae">analysis/         ……… llm-analyzer-engineer</span>
+├── <span class="own-be">domain/           ……… backend-engineer（FSM・triage）</span>
+├── <span class="own-be">repositories/     ……… backend-engineer</span>
+├── <span class="own-be">services/         ……… backend-engineer</span>
+├── <span class="own-be">api/              ……… backend-engineer</span>
+├── <span class="own-be">notify/           ……… backend-engineer（スタブ）</span>
+├── <span class="own-be">scheduler.py      ……… backend-engineer</span>
+└── <span class="own-be">main.py / config.py … backend-engineer</span>
+<span class="own-fe">frontend/            ……… frontend-engineer</span>
+<span class="own-be">migrations/          ……… backend-engineer</span>
+</code></pre>
+</section>
+<table>
+  <tr><th>エージェント</th><th>担当</th><th>主な成果物</th><th>状態</th></tr>
+  <tr><td><span class="own-mie">mail-ingestion-engineer</span></td><td>受信・正規化</td><td><code>GmailImapSource</code>（差分取得・正規化）。既存 <code>fetch_gmail_imap.py</code> 移設。</td><td><span class="chip done">実装</span></td></tr>
+  <tr><td><span class="own-lae">llm-analyzer-engineer</span></td><td>LLM箱</td><td><code>Analyzer</code> 契約・<code>StubAnalyzer</code>・出力検証・プロンプト雛形。</td><td><span class="chip stub">箱</span></td></tr>
+  <tr><td><span class="own-be">backend-engineer</span></td><td>状態管理/DB/API/通知/スケジューラ</td><td>FSM・Repository・サービス・ルータ・JWT・APScheduler・通知スタブ。</td><td><span class="chip done">実装</span></td></tr>
+  <tr><td><span class="own-fe">frontend-engineer</span></td><td>ダッシュボード</td><td>Vue3 一覧・状態変更・APIクライアント（ラフ）。</td><td><span class="chip rough">ラフ</span></td></tr>
+  <tr><td><span class="own-arch">architect / 司令塔</span></td><td>契約確定・統合</td><td><code>ports/</code>・<code>models.py</code>・結線レビュー。</td><td><span class="chip done">実装</span></td></tr>
+</table>
+<div class="ok"><b>並列の前提</b>：<code>ports/</code> と <code>models.py</code> が確定すれば、4担当は<b>互いのファイルに触れずに</b>並列実装できる。結合は司令塔が <code>main.py</code>（DI 結線）で行う。集約後に code-reviewer / security-scanner で監査。</div>
+
+<!-- ===== 10 ===== -->
+<h2 id="s10">10. 実装順序・マイルストーン</h2>
+<table>
+  <tr><th>M</th><th>内容</th><th>担当</th><th>完了条件（受け入れ）</th></tr>
+  <tr><td>M0</td><td>契約確定：<code>ports/</code>・<code>models.py</code> 拡張・<code>config.py</code></td><td>司令塔</td><td>4 Protocol＋3スキーマが型チェック通過。<code>EmailMessage</code> 後方互換。</td></tr>
+  <tr><td>M1</td><td>永続化：Repository(SQLite)＋Alembic＋Memory</td><td>backend</td><td>upsert/query/update_state(楽観ロック)のユニットテスト緑。</td></tr>
+  <tr><td>M2</td><td>取得：<code>GmailImapSource</code>（移設＋差分取得）</td><td>mail-ingestion</td><td>CLI / モックで <code>EmailMessage[]</code> 取得。既読化なし確認。</td></tr>
+  <tr><td>M3</td><td>LLM箱：<code>StubAnalyzer</code>＋出力検証</td><td>llm-analyzer</td><td>決定的ユニットテスト緑。範囲外出力を弾く。</td></tr>
+  <tr><td>M4</td><td>取込結線：<code>IngestionService</code>＋<code>POST /sync</code></td><td>backend</td><td>同期→DBに状態付きで入る。再同期で状態巻き戻らない。</td></tr>
+  <tr><td>M5</td><td>API：<code>/messages</code>・状態更新・JWT・CORS</td><td>backend</td><td><code>GET /emails</code> 互換維持。409/422/401 が正しく出る。</td></tr>
+  <tr><td>M6</td><td>スケジューラ＋通知スタブ</td><td>backend</td><td>定期取込が回り、未対応検知でログ通知（べき等）。</td></tr>
+  <tr><td>M7</td><td>フロント（ラフ）</td><td>frontend</td><td>一覧表示・未対応フィルタ・状態変更がブラウザで動く。</td></tr>
+  <tr><td>M8</td><td>監査・統合</td><td>司令塔/gate</td><td>code-reviewer/security-scanner 指摘解消。E2E で一気通貫。</td></tr>
+</table>
+<p class="muted">M1–M3 は M0 後に<b>並列可</b>。M4 は M1–M3 に依存。Supabase(PG) への切替は SQLite で固めた後（同じ Repository 実装＋接続文字列差替）。</p>
+
+<!-- ===== 11 ===== -->
+<h2 id="s11">11. 想定エラー・バグ一覧（横断サマリ）</h2>
+<table>
+  <tr><th>分類</th><th>事象</th><th>HTTP/挙動</th><th>対策</th></tr>
+  <tr><td>認証</td><td>JWT 無効/期限切れ</td><td>401</td><td><code>get_current_user</code> で検証。フロントは再ログイン。</td></tr>
+  <tr><td>競合</td><td>version ずれ</td><td>409</td><td>楽観ロック＋最新版返却→再取得。</td></tr>
+  <tr><td>入力</td><td>不正な状態遷移/範囲外limit</td><td>422</td><td>許可表＋pydantic 範囲検証。</td></tr>
+  <tr><td>外部</td><td>IMAP ログイン/timeout</td><td>取込ログ/一覧は継続</td><td>リトライ＋資格情報秘匿。</td></tr>
+  <tr><td>外部</td><td>DB 接続断</td><td>503（読出）/取込リトライ</td><td>接続プール・再試行。秘密情報を含めない。</td></tr>
+  <tr><td>LLM</td><td>出力スキーマ違反/注入</td><td>既定値で継続</td><td><code>extra="forbid"</code>・範囲検証・指示分離。</td></tr>
+  <tr><td>整合</td><td>再取込での状態巻き戻り</td><td>—</td><td>upsert は本体のみ・<code>state</code> 保持。</td></tr>
+  <tr><td>重複</td><td>通知連発/二重取込</td><td>—</td><td><code>dedupe_key</code>・<code>max_instances=1</code>。</td></tr>
+  <tr><td>データ</td><td>壊れた MIME/日時</td><td>—</td><td>フォールバック＋警告ログ、1通失敗で全体を止めない。</td></tr>
+  <tr><td>フロント</td><td>本文由来 XSS</td><td>—</td><td>DOMPurify／既定テキスト表示。</td></tr>
+</table>
+
+<!-- ===== 付録 ===== -->
+<h2 id="s12">付録. 環境変数・構成</h2>
+<table>
+  <tr><th>変数</th><th>用途</th><th>備考</th></tr>
+  <tr><td><code>GMAIL_ADDRESS</code> / <code>GMAIL_APP_PASSWORD</code></td><td>IMAP 認証</td><td><code>secrets/gmail.env</code>（gitignore）</td></tr>
+  <tr><td><code>DATABASE_URL</code></td><td>DB 接続</td><td>PG（Supabase）or SQLite。未設定で SQLite フォールバック。</td></tr>
+  <tr><td><code>JWT_SECRET</code> / <code>JWT_AUD</code></td><td>トークン検証</td><td>Secrets から。コミット禁止。</td></tr>
+  <tr><td><code>ALLOWED_ORIGINS</code></td><td>CORS 許可 origin</td><td>カンマ区切り。ワイルドカード禁止（既存方針）。</td></tr>
+  <tr><td><code>SYNC_INTERVAL_SEC</code></td><td>取込間隔</td><td>APScheduler。</td></tr>
+  <tr><td><code>ANALYZER</code></td><td>LLM 実装選択</td><td><code>stub</code>（既定）/将来 <code>openai</code> 等。</td></tr>
+</table>
+<div class="note">秘密情報は <code>*.env.example</code> のみコミット可（値はダミー）。実値はローカル/Secrets のみ。</div>
+
+<footer>
+  ReplyGuard 大枠実装 設計仕様書 — 2026-06-09。最初に共有された全体構成（JPEG）を厳守。
+  現行実装の詳細は <code>docs/architecture.html</code> / <code>docs/spec.html</code>、PoC 方針は <code>docs/poc-email-ingestion.md</code>、全体像は <code>docs/project-overview.md</code> を参照。
+</footer>
+
+</div><!-- /wrap -->
+</div><!-- /app -->
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad:true, theme:'default', securityLevel:'strict',
+    themeVariables:{ fontSize:'13px', primaryColor:'#eef3fb', lineColor:'#2563eb',
+      primaryBorderColor:'#d8dee9', primaryTextColor:'#1c2430' }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReplyGuard — プログラム解説</title>
+<style>
+  :root {
+    --bg:#0f1117; --panel:#1a1d27; --border:#2b3040; --fg:#e6e8ef;
+    --muted:#9aa3b8; --accent:#5b8cff; --accent2:#36c692; --accent3:#c08cff;
+    --code-bg:#11141d; --warn:#f0a73f;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:"Segoe UI","Hiragino Kaku Gothic ProN","Meiryo",system-ui,sans-serif;
+    line-height:1.7;font-size:15px;}
+  .wrap{max-width:960px;margin:0 auto;padding:40px 24px 80px;}
+  header.hero{border-bottom:1px solid var(--border);padding-bottom:24px;margin-bottom:28px;}
+  h1{font-size:28px;margin:0 0 8px;letter-spacing:.02em;}
+  .sub{color:var(--muted);font-size:14px;}
+  .badges{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;}
+  .badge{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--panel);
+    border:1px solid var(--border);color:var(--muted);}
+  .badge.ok{color:var(--accent2);border-color:#2a5e4a;}
+  h2{font-size:20px;margin:42px 0 14px;padding-left:10px;border-left:3px solid var(--accent);}
+  h3{font-size:15px;margin:20px 0 8px;color:var(--accent2);}
+  p{margin:8px 0;} .muted{color:var(--muted);}
+  section.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:18px 20px;margin:14px 0;}
+  code{background:var(--code-bg);padding:1px 6px;border-radius:5px;
+    font-family:"Consolas","SFMono-Regular",monospace;font-size:13px;color:#cdd6f4;}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;
+    padding:14px 16px;overflow-x:auto;font-size:13px;line-height:1.55;}
+  pre code{background:none;padding:0;}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px;}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{color:var(--muted);font-weight:600;font-size:13px;}
+  tr:last-child td{border-bottom:none;}
+  ul{margin:8px 0;padding-left:22px;} li{margin:4px 0;}
+  a{color:var(--accent);}
+  /* レイヤ図 */
+  .layers{display:flex;flex-direction:column;gap:0;margin:16px 0;}
+  .layer{border:1px solid var(--border);border-radius:10px;padding:14px 18px;background:var(--code-bg);}
+  .layer .lname{font-weight:700;font-size:15px;}
+  .layer .lfile{color:var(--muted);font-size:12px;font-family:monospace;}
+  .layer.l1{border-left:4px solid var(--accent);}
+  .layer.l2{border-left:4px solid var(--accent2);}
+  .layer.l3{border-left:4px solid var(--accent3);}
+  .laxis{text-align:center;color:var(--muted);font-size:18px;margin:2px 0;}
+  /* フロー */
+  .flow{display:flex;flex-direction:column;gap:6px;margin:12px 0;}
+  .flow .step{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;}
+  .flow .step b{color:var(--accent);}
+  .flow .arrow{text-align:center;color:var(--muted);font-size:15px;}
+  .tag{font-size:11px;padding:2px 8px;border-radius:999px;background:#23262f;color:var(--muted);}
+  .tree{white-space:pre;}
+  .note{border-left:3px solid var(--warn);background:#241f17;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px;}
+  footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>ReplyGuard — プログラム解説</h1>
+  <div class="sub">現在の実装（Gmail 取得 → 正規化 → API 公開）の構造とコードの読み方</div>
+  <div class="badges">
+    <span class="badge ok">Status: 動作確認済み</span>
+    <span class="badge">Python 3.12 / FastAPI / Docker</span>
+    <span class="badge">IMAP + アプリパスワード</span>
+    <span class="badge">2026-06-08</span>
+  </div>
+</header>
+
+<h2>1. 全体アーキテクチャ（3層）</h2>
+<p>API 化により、責務が3層に分かれ、依存は<b>上から下への一方向</b>。下の層ほど安定・汎用です。</p>
+<div class="layers">
+  <div class="layer l3">
+    <div class="lname">API層 <span class="tag">HTTPで公開</span></div>
+    <div class="lfile">app/main.py</div>
+    <p class="muted" style="margin:6px 0 0">FastAPI。<code>GET /emails</code> でメールを JSON 配列として返す入口。実処理は持たず取得層へ委譲。</p>
+  </div>
+  <div class="laxis">▲ 使う / ▼ 呼ぶ</div>
+  <div class="layer l2">
+    <div class="lname">取得層 <span class="tag">心臓部</span></div>
+    <div class="lfile">app/fetch_gmail_imap.py</div>
+    <p class="muted" style="margin:6px 0 0">Gmail に IMAP 接続し、整形して <code>EmailMessage</code> のリストを返す。API と CLI が共用。</p>
+  </div>
+  <div class="laxis">▲ 使う / ▼ 参照</div>
+  <div class="layer l1">
+    <div class="lname">スキーマ層 <span class="tag">データの形</span></div>
+    <div class="lfile">app/models.py</div>
+    <p class="muted" style="margin:6px 0 0">プロバイダ非依存の共通モデル <code>EmailMessage</code>。全層が共有する「メール1通」の定義。</p>
+  </div>
+</div>
+<p class="muted">拡張点が明確: Outlook を足す→取得層に兄弟ファイル / UI を足す→API層を叩く / LLM を足す→取得結果にスコアを付与。</p>
+
+<h2>2. ファイル構成</h2>
+<section class="card">
+<pre class="tree"><code>app/
+├── __init__.py            パッケージ化（import を成立させる空ファイル）
+├── models.py              EmailMessage（共通スキーマ）
+├── fetch_gmail_imap.py    取得層: fetch_emails() ＋ CLI
+├── main.py                API層: FastAPI / GET /emails
+└── fetch_gmail.py         予備（OAuth/Gmail API版・未使用）
+docker/
+├── Dockerfile
+└── docker-compose.yml     api / gmail-poc / gmail-poc-oauth の3サービス
+secrets/gmail.env          認証情報（gitignore済み）
+requirements.txt           fastapi / uvicorn / google-* </code></pre>
+</section>
+
+<h2>3. スキーマ層 — <code>models.py</code></h2>
+<pre><code>class EmailMessage(BaseModel):
+    id: str
+    provider: str = "gmail"
+    subject: str = ""
+    sender: str = ""
+    to: list[str] = []
+    received_at: datetime | None = None
+    snippet: str = ""
+    is_unread: bool = False</code></pre>
+<ul>
+  <li><b>pydantic の BaseModel</b>。プロジェクト全体の「メール1通」の定義。</li>
+  <li>役割① <b>共通の形</b>: Gmail/Outlook どちらもこの形に揃える → 上位層は取得元を意識しない。</li>
+  <li>役割② <b>変換</b>: FastAPI がこれを使い <code>datetime</code> を ISO 文字列 JSON に自動変換。</li>
+  <li>将来 <code>body_text</code> / <code>importance</code> を足す予定地（LLMフェーズ）。</li>
+</ul>
+
+<h2>4. 取得層 — <code>fetch_gmail_imap.py</code></h2>
+<p>役割ごとに関数を分割。中核は <code>fetch_emails()</code>。</p>
+
+<h3>① 認証情報の取り出し</h3>
+<pre><code>address = os.environ.get("GMAIL_ADDRESS", "").strip()
+app_password = os.environ.get("GMAIL_APP_PASSWORD", "").replace(" ", "")</code></pre>
+<p>環境変数から読み、アプリパスワードの空白を除去。未設定なら <code>RuntimeError</code>。</p>
+
+<h3>② 接続</h3>
+<pre><code>imap = imaplib.IMAP4_SSL("imap.gmail.com", 993)
+imap.login(address, app_password)
+imap.select("INBOX", readonly=True)   # 覗くだけ・既読化しない</code></pre>
+
+<h3>③ 取得本体</h3>
+<pre><code>status, data = imap.search(None, "ALL")
+ids = data[0].split()
+latest = ids[-limit:][::-1]            # 末尾=最新 を新しい順に
+for num in latest:
+    imap.fetch(num, f"(FLAGS BODY.PEEK[]&lt;0.{PREVIEW_BYTES}&gt;)")</code></pre>
+<table>
+  <tr><th>ポイント</th><th>意味</th></tr>
+  <tr><td><code>BODY.PEEK[]&lt;0.16384&gt;</code></td><td>全文ではなく先頭16KBだけ取得。ヘッダは先頭にあるので件名等は完全に取れ、添付込み巨大メールでも軽量（レビュー指摘対応）。</td></tr>
+  <tr><td><code>FLAGS</code></td><td>同時取得し、応答に <code>\Seen</code> が無ければ未読 → <code>is_unread</code>。</td></tr>
+  <tr><td><code>PEEK</code></td><td>サーバ上の既読フラグを変えない。</td></tr>
+  <tr><td><code>finally: logout()</code></td><td>必ず接続を閉じる。</td></tr>
+</table>
+
+<h3>④ 整形ヘルパー</h3>
+<ul>
+  <li><code>decode()</code> — <code>=?UTF-8?B?...?=</code> 形式の件名/差出人を人間可読に（日本語の文字化け防止）。</li>
+  <li><code>extract_snippet()</code> — multipart を <code>walk()</code> して text/plain の先頭120字を抽出。</li>
+</ul>
+
+<h3>⑤ CLI 兼用</h3>
+<pre><code>def main():
+    for m in fetch_emails():
+        print(...)   # 未読●付きで一覧表示
+
+if __name__ == "__main__":
+    main()           # python -m app.fetch_gmail_imap で実行</code></pre>
+<p class="muted">API と CLI が<b>同じ <code>fetch_emails()</code> を共用</b>しているのが設計上の要点。</p>
+
+<h2>5. API層 — <code>main.py</code></h2>
+<pre><code>app = FastAPI(title="ReplyGuard API", version="0.1.0")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], ...)
+
+@app.get("/emails", response_model=list[EmailMessage])
+def get_emails(limit: int = Query(MAX_RESULTS, ge=1, le=50)):
+    try:
+        return fetch_emails(limit=limit)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))</code></pre>
+<ul>
+  <li><b>薄い層</b>: HTTP の入口だけ。実処理は取得層に委譲。</li>
+  <li><code>response_model</code> で出力型を保証し、自動 JSON 化 ＋ Swagger 生成。</li>
+  <li><code>limit</code> は <code>ge=1, le=50</code> で範囲バリデーション。</li>
+  <li>認証エラー(<code>RuntimeError</code>)を <b>HTTP 500</b> に変換。CLI 側は同じ例外を <code>SystemExit</code> で表示 → 層ごとに適切なエラー処理。</li>
+  <li><code>/health</code> は起動待ち・死活監視用。</li>
+</ul>
+
+<h2>6. Docker層</h2>
+<p>1つのイメージを共有し、<code>command</code> だけ変えて3用途に使い分け。</p>
+<table>
+  <tr><th>サービス</th><th>コマンド</th><th>用途</th></tr>
+  <tr><td><code>api</code></td><td>uvicorn app.main:app</td><td>API。ホストは <code>127.0.0.1:8000</code> に loopback 限定公開</td></tr>
+  <tr><td><code>gmail-poc</code></td><td>python -m app.fetch_gmail_imap</td><td>CLI 一覧表示</td></tr>
+  <tr><td><code>gmail-poc-oauth</code></td><td>python -m app.fetch_gmail</td><td>予備（OAuth版・未使用）</td></tr>
+</table>
+<div class="note">コードはイメージに<b>焼き込む</b>方式。<code>.py</code> を変更したら <code>docker compose -f docker/docker-compose.yml build</code> で再ビルドが必要。</div>
+
+<h2>7. データフロー（API リクエスト1回）</h2>
+<div class="flow">
+  <div class="step"><b>ブラウザ</b> GET /emails?limit=3</div>
+  <div class="arrow">↓</div>
+  <div class="step"><b>main.get_emails(3)</b> — バリデーション後、取得層を呼ぶ</div>
+  <div class="arrow">↓</div>
+  <div class="step"><b>fetch_emails(3)</b> — IMAPログイン → search → 最新3件のID</div>
+  <div class="arrow">↓</div>
+  <div class="step">各IDを <code>FLAGS BODY.PEEK[]&lt;0.16384&gt;</code> で取得 → decode / snippet 整形</div>
+  <div class="arrow">↓</div>
+  <div class="step"><b>EmailMessage のリスト</b>を返す</div>
+  <div class="arrow">↓</div>
+  <div class="step"><b>FastAPI</b> が UTF-8 JSON にシリアライズして応答</div>
+</div>
+
+<h2>8. 設計上の効いている判断</h2>
+<ul>
+  <li><b>取得ロジックを <code>fetch_emails()</code> に1本化</b> → API も CLI も同じ実装を共用。</li>
+  <li><b><code>EmailMessage</code> で出力形を固定</b> → 次の LLM 層は「結果にスコアを足す」だけ、UI 層は「<code>/emails</code> を叩く」だけで済む。</li>
+  <li><b>層ごとのエラー変換</b>（CLI=SystemExit / API=HTTP 500）で、どの入口でも適切に失敗を伝える。</li>
+</ul>
+
+<footer>
+  ReplyGuard プログラム解説 — 2026-06-08 時点の実装に基づく自動生成。
+  仕様の概要は <code>docs/spec.html</code>、方針は <code>docs/poc-email-ingestion.md</code> を参照。
+</footer>
+
+</div>
+</body>
+</html>

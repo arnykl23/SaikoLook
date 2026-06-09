@@ -1,0 +1,26 @@
+# === API / 設定 ===
+fastapi
+uvicorn[standard]
+pydantic>=2
+pydantic-settings
+
+# === 永続化（既定 SQLite / 任意 Postgres） ===
+SQLAlchemy>=2.0
+alembic
+psycopg2-binary
+
+# === 取得・正規化 ===
+beautifulsoup4          # HTML メール本文からの素テキスト抽出
+APScheduler             # 定期取得スケジューラ
+
+# === 認証 ===
+PyJWT
+
+# === HTTP / LLM（analyzer=stub なら未使用・任意で有効化） ===
+httpx
+anthropic
+openai
+
+# === OAuth/Gmail API 版（予備・現行の IMAP 経路では未使用） ===
+google-api-python-client
+google-auth-oauthlib
