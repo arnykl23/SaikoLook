@@ -15,6 +15,9 @@ from app.ports.errors import NotFoundError
 from app.ports.repository import Repository
 
 
+_AUTO_ARCHIVE_STATES = frozenset({MessageState.DONE, MessageState.DISMISSED})
+
+
 class StateService:
     def __init__(self, repo: Repository) -> None:
         self._repo = repo
@@ -22,10 +25,16 @@ class StateService:
     def transition(
         self, message_id: str, target: MessageState, expected_version: int
     ) -> MessageRecord:
-        """message_id を target へ遷移する（楽観ロック）. 更新後レコードを返す."""
+        """message_id を target へ遷移する（楽観ロック）. 更新後レコードを返す.
+
+        done / dismissed への遷移では自動的に is_archived=True にする.
+        """
         current = self._repo.get(message_id)
         if current is None:
             raise NotFoundError(f"message_id={message_id} は存在しません")
         # 早期に分かりやすい TransitionError を出す（repo 側でも再検証する）.
         assert_transition(message_id, current.state, target)
-        return self._repo.update_state(message_id, target, expected_version)
+        record = self._repo.update_state(message_id, target, expected_version)
+        if target in _AUTO_ARCHIVE_STATES:
+            record = self._repo.set_archived(message_id, True)
+        return record

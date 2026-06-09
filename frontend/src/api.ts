@@ -34,16 +34,6 @@ async function parseError(res: Response): Promise<string> {
   return `HTTP ${res.status}`;
 }
 
-/** トリアージ高い順のメッセージ一覧. */
-export async function fetchMessages(): Promise<MessageRecord[]> {
-  const url = `${API_BASE}/messages?order_by=triage_score&descending=true`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new ApiError(await parseError(res), res.status);
-  }
-  return (await res.json()) as MessageRecord[];
-}
-
 /** 状態変更(楽観ロック). 409 は ConflictError として投げ直す. */
 export async function updateMessageState(
   messageId: string,
@@ -71,4 +61,34 @@ export async function triggerIngest(): Promise<void> {
   if (!res.ok) {
     throw new ApiError(await parseError(res), res.status);
   }
+}
+
+/** メッセージ一覧取得. archived=false で受信トレイ, true でアーカイブ. */
+export async function getMessages(archived = false): Promise<MessageRecord[]> {
+  const url = `${API_BASE}/messages?archived=${archived}&order_by=triage_score&descending=true`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new ApiError(await parseError(res), res.status);
+  }
+  return (await res.json()) as MessageRecord[];
+}
+
+/** 手動アーカイブ. */
+export async function archiveMessage(messageId: string): Promise<MessageRecord> {
+  const url = `${API_BASE}/messages/${encodeURIComponent(messageId)}/archive`;
+  const res = await fetch(url, { method: "POST" });
+  if (!res.ok) {
+    throw new ApiError(await parseError(res), res.status);
+  }
+  return (await res.json()) as MessageRecord;
+}
+
+/** 復元 (is_archived=false & state=unhandled に戻す). */
+export async function unarchiveMessage(messageId: string): Promise<MessageRecord> {
+  const url = `${API_BASE}/messages/${encodeURIComponent(messageId)}/unarchive`;
+  const res = await fetch(url, { method: "POST" });
+  if (!res.ok) {
+    throw new ApiError(await parseError(res), res.status);
+  }
+  return (await res.json()) as MessageRecord;
 }

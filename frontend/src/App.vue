@@ -3,11 +3,14 @@ import { computed, onMounted, ref } from "vue";
 import type { MessageRecord, MessageState } from "./types";
 import {
   ConflictError,
-  fetchMessages,
+  getMessages,
   triggerIngest,
+  unarchiveMessage,
   updateMessageState,
 } from "./api";
 import MessageCard from "./components/MessageCard.vue";
+
+type Tab = "inbox" | "archive";
 
 const records = ref<MessageRecord[]>([]);
 const loading = ref(false);
@@ -15,6 +18,7 @@ const ingesting = ref(false);
 const error = ref<string | null>(null);
 const notice = ref<string | null>(null);
 const busyIds = ref<Set<string>>(new Set());
+const activeTab = ref<Tab>("inbox");
 
 const unhandledCount = computed(
   () => records.value.filter((r) => r.state === "unhandled").length,
@@ -24,12 +28,18 @@ async function load(): Promise<void> {
   loading.value = true;
   error.value = null;
   try {
-    records.value = await fetchMessages();
+    records.value = await getMessages(activeTab.value === "archive");
   } catch (e) {
     error.value = e instanceof Error ? e.message : "読み込みに失敗しました.";
   } finally {
     loading.value = false;
   }
+}
+
+async function switchTab(tab: Tab): Promise<void> {
+  if (activeTab.value === tab) return;
+  activeTab.value = tab;
+  await load();
 }
 
 async function onIngest(): Promise<void> {
@@ -62,15 +72,9 @@ async function onChangeState(
   error.value = null;
   notice.value = null;
   try {
-    const updated = await updateMessageState(
-      record.message_id,
-      state,
-      record.version,
-    );
-    const idx = records.value.findIndex(
-      (r) => r.message_id === record.message_id,
-    );
-    if (idx !== -1) records.value[idx] = updated;
+    await updateMessageState(record.message_id, state, record.version);
+    // done/dismissed 後にバックエンドが自動アーカイブするため全件リフェッチ
+    await load();
   } catch (e) {
     if (e instanceof ConflictError) {
       notice.value = e.message;
@@ -78,6 +82,21 @@ async function onChangeState(
     } else {
       error.value = e instanceof Error ? e.message : "更新に失敗しました.";
     }
+  } finally {
+    setBusy(record.message_id, false);
+  }
+}
+
+async function onUnarchive(record: MessageRecord): Promise<void> {
+  setBusy(record.message_id, true);
+  error.value = null;
+  notice.value = null;
+  try {
+    await unarchiveMessage(record.message_id);
+    await load();
+    notice.value = "受信トレイに復元しました.";
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : "復元に失敗しました.";
   } finally {
     setBusy(record.message_id, false);
   }
@@ -94,7 +113,11 @@ onMounted(load);
         <span class="tag-line">受信トレイ管制塔</span>
       </div>
       <div class="bar-right">
-        <span class="counter" :class="{ alert: unhandledCount > 0 }">
+        <span
+          v-if="activeTab === 'inbox'"
+          class="counter"
+          :class="{ alert: unhandledCount > 0 }"
+        >
           未対応 {{ unhandledCount }}
         </span>
         <button
@@ -108,13 +131,39 @@ onMounted(load);
         <button
           type="button"
           class="ingest"
-          :disabled="ingesting"
+          :disabled="loading || ingesting"
           @click="onIngest"
         >
           {{ ingesting ? "取り込み中…" : "手動更新" }}
         </button>
       </div>
     </header>
+
+    <nav class="tabs" role="tablist" aria-label="メールビュー切り替え">
+      <button
+        role="tab"
+        :aria-selected="activeTab === 'inbox'"
+        class="tab"
+        :class="{ active: activeTab === 'inbox' }"
+        @click="switchTab('inbox')"
+      >
+        受信トレイ
+        <span
+          v-if="activeTab === 'inbox' && unhandledCount > 0"
+          class="tab-badge"
+          aria-hidden="true"
+        >{{ unhandledCount }}</span>
+      </button>
+      <button
+        role="tab"
+        :aria-selected="activeTab === 'archive'"
+        class="tab"
+        :class="{ active: activeTab === 'archive' }"
+        @click="switchTab('archive')"
+      >
+        アーカイブ
+      </button>
+    </nav>
 
     <main class="main">
       <p v-if="error" class="banner err" role="alert">{{ error }}</p>
@@ -125,7 +174,12 @@ onMounted(load);
         v-else-if="!loading && records.length === 0 && !error"
         class="state-msg"
       >
-        メッセージはありません. 「手動更新」で取り込んでください.
+        <template v-if="activeTab === 'inbox'">
+          メッセージはありません. 「手動更新」で取り込んでください.
+        </template>
+        <template v-else>
+          アーカイブにメッセージはありません.
+        </template>
       </p>
 
       <div v-else class="list">
@@ -134,7 +188,9 @@ onMounted(load);
           :key="r.message_id"
           :record="r"
           :busy="busyIds.has(r.message_id)"
+          :mode="activeTab"
           @change-state="(s) => onChangeState(r, s)"
+          @unarchive="onUnarchive(r)"
         />
       </div>
     </main>
@@ -209,6 +265,43 @@ onMounted(load);
 .ingest:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  margin-top: 12px;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.tab-badge {
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--danger);
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 6px;
+  min-width: 16px;
+  text-align: center;
 }
 .main {
   margin-top: 16px;

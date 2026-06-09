@@ -17,6 +17,7 @@ class MessageQuery:
 
     state: MessageState | None = None       # 状態で絞り込み（None=全件）
     unread_only: bool = False
+    archived: bool = False                  # False=メインフィード, True=アーカイブビュー
     limit: int = 100
     offset: int = 0
     order_by: str = "triage_score"          # "triage_score" | "received_at"
@@ -51,5 +52,20 @@ class Repository(Protocol):
         - 対象が無ければ NotFoundError
         - expected_version が現在と不一致なら ConflictError
         - FSM 上不正な遷移なら TransitionError
+        """
+        ...
+
+    def set_archived(self, message_id: str, archived: bool) -> MessageRecord:
+        """is_archived を更新する. 更新後のレコードを返す.
+
+        - 対象が無ければ NotFoundError
+        """
+        ...
+
+    def unarchive(self, message_id: str) -> MessageRecord:
+        """アーカイブを解除し状態を unhandled に戻す（原子更新）.
+
+        is_archived=False, state=unhandled, version+=1 を1回の UPDATE で行う.
+        - 対象が無ければ NotFoundError
         """
         ...

@@ -5,13 +5,18 @@ import { ACTIONABLE_STATES } from "../types";
 import ImportanceBadge from "./ImportanceBadge.vue";
 import StateBadge from "./StateBadge.vue";
 
-const props = defineProps<{
-  record: MessageRecord;
-  busy?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    record: MessageRecord;
+    busy?: boolean;
+    mode?: "inbox" | "archive";
+  }>(),
+  { mode: "inbox" },
+);
 
 const emit = defineEmits<{
   (e: "change-state", state: MessageState): void;
+  (e: "unarchive"): void;
 }>();
 
 const STATE_LABELS: Record<MessageState, string> = {
@@ -54,6 +59,8 @@ const receivedAt = computed(() => {
 
 const triage = computed(() => props.record.triage_score.toFixed(1));
 
+const isArchive = computed(() => props.mode === "archive");
+
 // 現在の状態は遷移先ボタンから除く
 const nextStates = computed(() =>
   ACTIONABLE_STATES.filter((s) => s !== props.record.state),
@@ -61,7 +68,7 @@ const nextStates = computed(() =>
 </script>
 
 <template>
-  <article class="card" :class="{ unread: email.is_unread }">
+  <article class="card" :class="{ unread: email.is_unread, archive: isArchive }">
     <div class="top">
       <ImportanceBadge :importance="importance" />
       <div class="head">
@@ -90,16 +97,27 @@ const nextStates = computed(() =>
     </div>
 
     <div class="actions">
+      <template v-if="!isArchive">
+        <button
+          v-for="s in nextStates"
+          :key="s"
+          type="button"
+          class="act"
+          :class="`act-${s}`"
+          :disabled="busy"
+          @click="emit('change-state', s)"
+        >
+          {{ STATE_LABELS[s] }}
+        </button>
+      </template>
       <button
-        v-for="s in nextStates"
-        :key="s"
+        v-else
         type="button"
-        class="act"
-        :class="`act-${s}`"
+        class="act act-unarchive"
         :disabled="busy"
-        @click="emit('change-state', s)"
+        @click="emit('unarchive')"
       >
-        {{ STATE_LABELS[s] }}
+        復元
       </button>
     </div>
   </article>
@@ -228,5 +246,13 @@ const nextStates = computed(() =>
 .act-dismissed:hover:not(:disabled) {
   border-color: var(--text-muted);
   color: var(--text-muted);
+}
+.act-unarchive:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.card.archive {
+  background: var(--bg);
+  opacity: 0.85;
 }
 </style>

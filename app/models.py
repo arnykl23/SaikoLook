@@ -63,6 +63,7 @@ class MessageRecord(BaseModel):
     analysis: AnalysisResult | None = None
     state: MessageState = MessageState.UNHANDLED
     triage_score: float = 0.0     # 未対応検知スコア(未読×重要度×経過時間)
+    is_archived: bool = False     # メインフィードから隠す可視性フラグ（状態とは独立）
     version: int = 0              # 楽観ロック用
     created_at: datetime | None = None
     updated_at: datetime | None = None

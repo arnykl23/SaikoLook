@@ -52,3 +52,30 @@ def test_transition_conflict_propagates(service):
     svc, _ = service
     with pytest.raises(ConflictError):
         svc.transition("gmail:1", MessageState.DONE, 99)
+
+
+def test_done_transition_auto_archives(service):
+    svc, repo = service
+    rec = svc.transition("gmail:1", MessageState.DONE, 0)
+    assert rec.state == MessageState.DONE
+    assert rec.is_archived is True
+    # DB 上も反映されていること.
+    stored = repo.get("gmail:1")
+    assert stored.is_archived is True
+
+
+def test_dismissed_transition_auto_archives(service):
+    svc, repo = service
+    repo.upsert_messages([make_record("2")])
+    rec = svc.transition("gmail:2", MessageState.DISMISSED, 0)
+    assert rec.state == MessageState.DISMISSED
+    assert rec.is_archived is True
+    stored = repo.get("gmail:2")
+    assert stored.is_archived is True
+
+
+def test_non_terminal_transition_does_not_archive(service):
+    svc, repo = service
+    rec = svc.transition("gmail:1", MessageState.IN_PROGRESS, 0)
+    assert rec.is_archived is False
+    assert repo.get("gmail:1").is_archived is False

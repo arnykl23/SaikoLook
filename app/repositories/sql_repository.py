@@ -61,6 +61,7 @@ def _to_record(orm: MessageRecordORM) -> MessageRecord:
         analysis=analysis,
         state=MessageState(orm.state),
         triage_score=orm.triage_score,
+        is_archived=orm.is_archived,
         version=orm.version,
         created_at=_to_aware_utc(orm.created_at),
         updated_at=_to_aware_utc(orm.updated_at),
@@ -105,6 +106,7 @@ class SqlRepository:
                             triage_score=record.triage_score,
                             is_unread=record.email.is_unread,
                             received_at=received_at,
+                            is_archived=False,
                             version=record.version,
                             created_at=now,
                             updated_at=now,
@@ -118,7 +120,7 @@ class SqlRepository:
                     existing.is_unread = record.email.is_unread
                     existing.received_at = received_at
                     existing.updated_at = now
-                    # state / version / created_at は保持.
+                    # state / version / created_at / is_archived は保持.
             session.commit()
         return inserted
 
@@ -135,12 +137,53 @@ class SqlRepository:
             stmt = stmt.where(MessageRecordORM.state == q.state.value)
         if q.unread_only:
             stmt = stmt.where(MessageRecordORM.is_unread.is_(True))
+        # archived フラグで常にフィルタ（False=メインフィード, True=アーカイブ）.
+        stmt = stmt.where(MessageRecordORM.is_archived == q.archived)
         # message_id を第2キーにして決定的な順序にする.
         stmt = stmt.order_by(direction, MessageRecordORM.message_id.asc())
         stmt = stmt.limit(q.limit).offset(q.offset)
         with self._session_factory() as session:
             rows = session.execute(stmt).scalars().all()
             return [_to_record(r) for r in rows]
+
+    def set_archived(self, message_id: str, archived: bool) -> MessageRecord:
+        """is_archived を更新する. 更新後のレコードを返す."""
+        with self._session_factory() as session:
+            orm = session.get(MessageRecordORM, message_id)
+            if orm is None:
+                raise NotFoundError(f"message_id={message_id} は存在しません")
+            now = _to_naive_utc(_utcnow())
+            stmt = (
+                update(MessageRecordORM)
+                .where(MessageRecordORM.message_id == message_id)
+                .values(is_archived=archived, updated_at=now)
+            )
+            session.execute(stmt)
+            session.commit()
+            refreshed = session.get(MessageRecordORM, message_id)
+            return _to_record(refreshed)
+
+    def unarchive(self, message_id: str) -> MessageRecord:
+        """アーカイブ解除: is_archived=False, state=unhandled, version+=1 を原子更新."""
+        with self._session_factory() as session:
+            orm = session.get(MessageRecordORM, message_id)
+            if orm is None:
+                raise NotFoundError(f"message_id={message_id} は存在しません")
+            now = _to_naive_utc(_utcnow())
+            stmt = (
+                update(MessageRecordORM)
+                .where(MessageRecordORM.message_id == message_id)
+                .values(
+                    is_archived=False,
+                    state=MessageState.UNHANDLED.value,
+                    version=MessageRecordORM.version + 1,
+                    updated_at=now,
+                )
+            )
+            session.execute(stmt)
+            session.commit()
+            refreshed = session.get(MessageRecordORM, message_id)
+            return _to_record(refreshed)
 
     def update_state(
         self, message_id: str, new_state: MessageState, expected_version: int
