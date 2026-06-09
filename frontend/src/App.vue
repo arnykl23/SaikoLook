@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import type { MessageRecord, MessageState } from "./types";
 import {
   type MessagesQuery,
@@ -127,6 +127,9 @@ async function onUnarchive(record: MessageRecord): Promise<void> {
   }
 }
 
+const AUTO_REFRESH_INTERVAL_MS = 60_000;
+let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
+
 onMounted(() => {
   void load();
   getProviders()
@@ -136,6 +139,13 @@ onMounted(() => {
     .catch(() => {
       // providers 取得失敗はフィルターチェックボックスが非表示になるだけで非致命的
     });
+  autoRefreshTimer = setInterval(() => {
+    void load();
+  }, AUTO_REFRESH_INTERVAL_MS);
+});
+
+onUnmounted(() => {
+  if (autoRefreshTimer !== null) clearInterval(autoRefreshTimer);
 });
 </script>
 
