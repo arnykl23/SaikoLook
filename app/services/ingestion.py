@@ -50,8 +50,8 @@ class IngestionService:
             message_id = MessageRecord.make_id(email.provider, email.id)
             try:
                 analysis = self._analyzer.analyze(email)
-                score = compute_triage_score(email, analysis, now)
                 urgency = compute_urgency_score(analysis, now)
+                score = compute_triage_score(analysis, now)
                 # 新規判定は upsert 前に確認する（state はリポジトリ側が既存保持）.
                 existing = self._repo.get(message_id)
                 record = MessageRecord(
