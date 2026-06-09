@@ -9,9 +9,11 @@ import {
   triggerIngest,
   unarchiveMessage,
   updateMessageState,
+  getAccounts,
 } from "./api";
 import MessageCard from "./components/MessageCard.vue";
 import FilterBar from "./components/FilterBar.vue";
+import AccountsModal from "./components/AccountsModal.vue";
 
 type Tab = "inbox" | "archive";
 
@@ -148,11 +150,31 @@ function toggleAutoRefresh(): void {
   autoRefresh.value ? startAutoRefresh() : stopAutoRefresh();
 }
 
+// --- アカウント管理 ---
+const showAccounts = ref(false);
+const hasAccounts = ref<boolean | null>(null);
+
+async function refreshAccountStatus(): Promise<void> {
+  try {
+    const acs = await getAccounts();
+    hasAccounts.value = acs.length > 0;
+  } catch {
+    // 取得失敗時は判定を null のまま（既存の空状態を表示しない）
+    hasAccounts.value = null;
+  }
+}
+
+function onAccountsChanged(): void {
+  void refreshAccountStatus();
+  void load();
+}
+
 onMounted(() => {
   void load();
   getProviders()
     .then((ps) => { availableProviders.value = ps; })
     .catch(() => {});
+  void refreshAccountStatus();
   startAutoRefresh();
 });
 
@@ -174,6 +196,13 @@ onUnmounted(() => { stopAutoRefresh(); });
         >
           未対応 {{ unhandledCount }}
         </span>
+        <button
+          type="button"
+          class="accounts-btn"
+          @click="showAccounts = true"
+        >
+          アカウント
+        </button>
         <button
           type="button"
           class="auto-refresh-btn"
@@ -240,6 +269,15 @@ onUnmounted(() => { stopAutoRefresh(); });
       />
 
       <p v-if="loading && records.length === 0" class="state-msg">読み込み中…</p>
+      <div
+        v-else-if="!loading && records.length === 0 && !error && hasAccounts === false"
+        class="state-msg no-account"
+      >
+        <p>アカウントが設定されていません.</p>
+        <button type="button" class="btn-add-account" @click="showAccounts = true">
+          アカウントを追加
+        </button>
+      </div>
       <p
         v-else-if="!loading && records.length === 0 && !error"
         class="state-msg"
@@ -264,6 +302,12 @@ onUnmounted(() => { stopAutoRefresh(); });
         />
       </div>
     </main>
+
+    <AccountsModal
+      v-if="showAccounts"
+      @close="showAccounts = false"
+      @accounts-changed="onAccountsChanged"
+    />
   </div>
 </template>
 
@@ -317,6 +361,7 @@ onUnmounted(() => { stopAutoRefresh(); });
   border-color: var(--danger);
   font-weight: 700;
 }
+.accounts-btn,
 .auto-refresh-btn,
 .refresh,
 .ingest {
@@ -401,6 +446,27 @@ onUnmounted(() => { stopAutoRefresh(); });
   color: var(--text-muted);
   text-align: center;
   padding: 48px 0;
+}
+.no-account {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.no-account p {
+  margin: 0;
+}
+.btn-add-account {
+  font-size: 13px;
+  padding: 6px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+.btn-add-account:hover {
+  opacity: 0.88;
 }
 .list {
   display: flex;

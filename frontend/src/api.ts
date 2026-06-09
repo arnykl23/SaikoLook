@@ -1,4 +1,4 @@
-import type { MessageRecord, MessageState } from "./types";
+import type { AccountConfig, AccountConfigCreate, MessageRecord, MessageState } from "./types";
 
 const API_BASE = (
   import.meta.env.VITE_API_BASE ?? "http://localhost:8000"
@@ -111,6 +111,32 @@ export async function archiveMessage(messageId: string): Promise<MessageRecord> 
     throw new ApiError(await parseError(res), res.status);
   }
   return (await res.json()) as MessageRecord;
+}
+
+/** アカウント一覧取得（認証情報は含まない）. */
+export async function getAccounts(): Promise<AccountConfig[]> {
+  const res = await fetch(`${API_BASE}/accounts`);
+  if (!res.ok) throw new ApiError(await parseError(res), res.status);
+  return (await res.json()) as AccountConfig[];
+}
+
+/** アカウント追加. */
+export async function createAccount(data: AccountConfigCreate): Promise<AccountConfig> {
+  const res = await fetch(`${API_BASE}/accounts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new ApiError(await parseError(res), res.status);
+  return (await res.json()) as AccountConfig;
+}
+
+/** アカウント削除. */
+export async function deleteAccount(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/accounts/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new ApiError(await parseError(res), res.status);
 }
 
 /** 復元 (is_archived=false & state=unhandled に戻す). */

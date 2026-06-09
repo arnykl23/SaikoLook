@@ -52,3 +52,17 @@ export const ACTIONABLE_STATES: readonly MessageState[] = [
   "snoozed",
   "dismissed",
 ] as const;
+
+export interface AccountConfig {
+  id: string;
+  provider: string;
+  label: string;
+  created_at: string | null;
+}
+
+export interface AccountConfigCreate {
+  provider: string;
+  label: string;
+  address: string;
+  credential: string;
+}

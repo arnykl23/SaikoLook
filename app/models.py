@@ -12,7 +12,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class EmailMessage(BaseModel):
@@ -72,3 +72,33 @@ class MessageRecord(BaseModel):
     @staticmethod
     def make_id(provider: str, raw_id: str) -> str:
         return f"{provider}:{raw_id}"
+
+
+_SUPPORTED_PROVIDERS = {"gmail"}
+
+
+class AccountConfig(BaseModel):
+    """アカウント設定（レスポンス用: 認証情報を含まない）."""
+
+    id: str
+    provider: str
+    label: str
+    created_at: datetime | None = None
+
+
+class AccountConfigCreate(BaseModel):
+    """アカウント追加リクエスト. credential はレスポンスには返さない."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    label: str
+    address: str
+    credential: str  # アプリパスワード等（保存後は API から取得不可）
+
+    @field_validator("provider")
+    @classmethod
+    def _validate_provider(cls, v: str) -> str:
+        if v not in _SUPPORTED_PROVIDERS:
+            raise ValueError(f"未対応のプロバイダ: {v}（対応: {_SUPPORTED_PROVIDERS}）")
+        return v

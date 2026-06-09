@@ -1,17 +1,19 @@
 """取得→分析→採点→保存→通知のパイプライン.
 
-IngestionService は各層のポート（MessageSource / Analyzer / Repository /
-Notifier）だけに依存し, 具象を知らない. 1 通の失敗で全体を落とさず, 個別に
+IngestionService は AccountRepository からアカウントを取得し, プロバイダごとに
+ソースを動的に構築してメールを取得する. 1 通の失敗で全体を落とさず, 個別に
 握り込んでログへ残す（観測性）. 本文全文はログ・例外詳細に出さない（LLM02）.
 """
 
 import logging
 from datetime import datetime, timezone
 
+from app.adapters.sources.gmail_imap import GmailImapSource
 from app.config import Settings
 from app.domain.triage import compute_triage_score, compute_urgency_score
 from app.models import MessageRecord
-from app.ports import Analyzer, MessageSource, Notifier, Repository
+from app.ports import Analyzer, Notifier, Repository
+from app.repositories.account_repository import AccountRepository
 
 logger = logging.getLogger(__name__)
 
@@ -21,17 +23,42 @@ class IngestionService:
 
     def __init__(
         self,
-        source: MessageSource,
+        account_repo: AccountRepository,
         analyzer: Analyzer,
         repo: Repository,
         notifier: Notifier,
         settings: Settings,
     ) -> None:
-        self._source = source
+        self._account_repo = account_repo
         self._analyzer = analyzer
         self._repo = repo
         self._notifier = notifier
         self._settings = settings
+
+    def _build_sources(self) -> list:
+        """DB アカウントからソースを構築. なければ env 変数のフォールバックを試みる."""
+        accounts = self._account_repo.list_for_ingest()
+        sources = []
+        for acc in accounts:
+            if acc["provider"] == "gmail":
+                sources.append(
+                    GmailImapSource(
+                        acc["address"],
+                        acc["credential"],
+                        max_body_chars=self._settings.llm_max_body_chars,
+                    )
+                )
+            # 将来: Slack, Outlook 等を追加
+        if not sources:
+            addr = self._settings.gmail_address
+            pw = self._settings.gmail_app_password
+            if addr and pw:
+                sources.append(
+                    GmailImapSource(
+                        addr, pw, max_body_chars=self._settings.llm_max_body_chars
+                    )
+                )
+        return sources
 
     def run_once(self) -> dict:
         """1 サイクル実行し件数を返す.
@@ -40,19 +67,29 @@ class IngestionService:
         個別メールの失敗は握り込み, 全体を止めない.
         """
         now = datetime.now(timezone.utc)
-        emails = self._source.list_recent(self._settings.ingest_limit)
-        fetched = len(emails)
 
+        sources = self._build_sources()
+        if not sources:
+            logger.info("ingest: アクティブなアカウントなし - スキップ")
+            return {"fetched": 0, "inserted": 0, "notified": 0}
+
+        all_emails = []
+        for source in sources:
+            try:
+                all_emails.extend(source.list_recent(self._settings.ingest_limit))
+            except Exception:
+                logger.exception("ingest: ソースの取得に失敗")
+
+        fetched = len(all_emails)
         records: list[MessageRecord] = []
         is_new_by_id: dict[str, bool] = {}
 
-        for email in emails:
+        for email in all_emails:
             message_id = MessageRecord.make_id(email.provider, email.id)
             try:
                 analysis = self._analyzer.analyze(email)
                 urgency = compute_urgency_score(analysis, now)
                 score = compute_triage_score(analysis, now)
-                # 新規判定は upsert 前に確認する（state はリポジトリ側が既存保持）.
                 existing = self._repo.get(message_id)
                 record = MessageRecord(
                     message_id=message_id,

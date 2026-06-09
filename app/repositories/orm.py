@@ -39,3 +39,21 @@ class MessageRecordORM(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class AccountConfigORM(Base):
+    """アカウント設定テーブル（Gmail / 将来 Slack・Outlook）.
+
+    PoC: credential（アプリパスワード等）は平文保存.
+    本番環境では必ず暗号化すること（Fernet / SQLCipher 等）.
+    DB ファイル（data/replyguard.db）は .gitignore 済みのため, ローカル PoC では許容.
+    """
+
+    __tablename__ = "account_configs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    provider: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String, nullable=False)
+    address: Mapped[str] = mapped_column(String, nullable=False)
+    credential: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

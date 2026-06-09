@@ -18,13 +18,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.adapters.sources import build_source
 from app.analysis.factory import build_analyzer
-from app.api import routes_emails, routes_messages
+from app.api import routes_accounts, routes_emails, routes_messages
 from app.config import get_settings
 from app.notify.factory import build_notifier
 from app.ports.errors import ConflictError, NotFoundError, TransitionError
 from app.repositories import build_repository
+from app.repositories.account_repository import AccountRepository
 from app.scheduler import start_scheduler
 from app.services.ingestion import IngestionService
 from app.services.state_service import StateService
@@ -43,15 +43,15 @@ async def lifespan(app: FastAPI):
         )
 
     repo = build_repository(settings)          # init_db 込み
-    source = build_source(settings)
+    account_repo = AccountRepository()
     analyzer = build_analyzer(settings)
     notifier = build_notifier(settings)
-    ingestion = IngestionService(source, analyzer, repo, notifier, settings)
+    ingestion = IngestionService(account_repo, analyzer, repo, notifier, settings)
     state_service = StateService(repo)
 
     app.state.settings = settings
     app.state.repo = repo
-    app.state.source = source
+    app.state.account_repo = account_repo
     app.state.analyzer = analyzer
     app.state.notifier = notifier
     app.state.ingestion = ingestion
@@ -72,10 +72,6 @@ async def lifespan(app: FastAPI):
     finally:
         if app.state.scheduler is not None:
             app.state.scheduler.shutdown(wait=False)
-        try:
-            source.close()
-        except Exception:
-            logger.exception("source.close に失敗")
 
 
 app = FastAPI(title="ReplyGuard API", version="0.2.0", lifespan=lifespan)
@@ -121,3 +117,4 @@ def health() -> dict:
 
 app.include_router(routes_emails.router)
 app.include_router(routes_messages.router)
+app.include_router(routes_accounts.router)
