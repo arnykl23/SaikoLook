@@ -10,6 +10,7 @@ import {
   unarchiveMessage,
   updateMessageState,
   getAccounts,
+  reauthGmailAccount,
 } from "./api";
 import MessageCard from "./components/MessageCard.vue";
 import FilterBar from "./components/FilterBar.vue";
@@ -154,6 +155,20 @@ function toggleAutoRefresh(): void {
 const showAccounts = ref(false);
 const hasAccounts = ref<boolean | null>(null);
 const accountsList = ref<import("./types").AccountConfig[]>([]);
+const oauthSuccessBanner = ref(false);
+
+const reauthAccounts = computed(() =>
+  accountsList.value.filter(a => a.auth_status === "reauth_required")
+);
+
+async function onReauth(accountId: string): Promise<void> {
+  try {
+    const { auth_url } = await reauthGmailAccount(accountId);
+    window.location.href = auth_url;
+  } catch (e) {
+    console.error("再接続 URL 取得失敗", e);
+  }
+}
 
 async function refreshAccountStatus(): Promise<void> {
   try {
@@ -171,13 +186,27 @@ function onAccountsChanged(): void {
   void load();
 }
 
-onMounted(() => {
+onMounted(async () => {
   void load();
   getProviders()
     .then((ps) => { availableProviders.value = ps; })
     .catch(() => {});
-  void refreshAccountStatus();
+  await refreshAccountStatus();
   startAutoRefresh();
+
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get("oauth_success") === "1") {
+    oauthSuccessBanner.value = true;
+    window.history.replaceState({}, "", window.location.pathname);
+    await refreshAccountStatus();
+    // アカウント追加直後に取り込みを自動実行してメールを即表示
+    try {
+      await triggerIngest();
+    } catch (e) {
+      console.error("自動取り込みに失敗（次回の自動更新で補完）:", e);
+    }
+    await load(); // ingest の成否に関わらず必ずリスト更新
+  }
 });
 
 onUnmounted(() => { stopAutoRefresh(); });
@@ -261,6 +290,22 @@ onUnmounted(() => { stopAutoRefresh(); });
     </nav>
 
     <main class="main">
+      <!-- OAuth 成功バナー -->
+      <div v-if="oauthSuccessBanner" class="banner banner--success">
+        Gmail アカウントの接続が完了しました．
+        <button @click="oauthSuccessBanner = false">✕</button>
+      </div>
+
+      <!-- reauth_required バナー -->
+      <div v-if="reauthAccounts.length" class="banner banner--warn">
+        {{ reauthAccounts.length }} 件のアカウントで Google 認証の更新が必要です．
+        <button
+          v-for="acc in reauthAccounts"
+          :key="acc.id"
+          @click="onReauth(acc.id)"
+        >{{ acc.label }} を再接続</button>
+      </div>
+
       <p v-if="error" class="banner err" role="alert">{{ error }}</p>
       <p v-if="notice" class="banner info" role="status">{{ notice }}</p>
 
@@ -475,5 +520,24 @@ onUnmounted(() => { stopAutoRefresh(); });
   display: flex;
   flex-direction: column;
   gap: var(--gap);
+}
+.banner {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md, 8px);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.banner--success { background: #d1fae5; color: #065f46; }
+.banner--warn    { background: #fef3c7; color: #92400e; }
+.banner button   {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
 }
 </style>

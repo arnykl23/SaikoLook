@@ -25,6 +25,10 @@ class AccountRepository:
     def __init__(self, session_factory=None) -> None:
         self._session_factory = session_factory or db.SessionLocal
 
+    def get_by_id(self, account_id: str) -> "AccountConfigORM | None":
+        with self._session_factory() as session:
+            return session.get(AccountConfigORM, account_id)
+
     def list_all(self) -> list[AccountConfig]:
         """レスポンス用（認証情報を含まない）."""
         stmt = select(AccountConfigORM).order_by(AccountConfigORM.created_at)
@@ -33,7 +37,8 @@ class AccountRepository:
             return [
                 AccountConfig(
                     id=r.id, provider=r.provider, label=r.label,
-                    address=r.address, created_at=r.created_at,
+                    address=r.address, auth_type=r.auth_type, auth_status=r.auth_status,
+                    created_at=r.created_at,
                 )
                 for r in rows
             ]
@@ -44,7 +49,15 @@ class AccountRepository:
         with self._session_factory() as session:
             rows = session.execute(stmt).scalars().all()
             return [
-                {"provider": r.provider, "address": r.address, "credential": r.credential}
+                {
+                    "id": r.id,
+                    "provider": r.provider,
+                    "address": r.address,        # 既存キー — 残す
+                    "credential": r.credential,  # 既存キー — 残す
+                    "auth_type": r.auth_type or "imap",
+                    "refresh_token": r.refresh_token,
+                    "auth_status": r.auth_status or "ok",
+                }
                 for r in rows
             ]
 
@@ -64,8 +77,65 @@ class AccountRepository:
             session.add(orm)
             session.commit()
             return AccountConfig(
-                id=orm.id, provider=orm.provider, label=orm.label, created_at=orm.created_at
+                id=orm.id, provider=orm.provider, label=orm.label,
+                address=orm.address,
+                auth_type="imap",
+                auth_status="ok",
+                created_at=orm.created_at,
             )
+
+    def create_oauth(
+        self, *, provider: str, label: str, address: str,
+        refresh_token: str, access_token: str | None = None,
+        token_expiry: "datetime | None" = None, scopes: str = "",
+        auth_status: str = "ok",
+    ) -> AccountConfig:
+        now = _utcnow_naive()
+        orm = AccountConfigORM(
+            id=str(uuid.uuid4()),
+            provider=provider,
+            label=label,
+            address=address,
+            credential="",
+            auth_type="oauth",
+            refresh_token=refresh_token,
+            access_token=access_token,
+            token_expiry=token_expiry,
+            scopes=scopes,
+            auth_status=auth_status,
+            created_at=now,
+        )
+        with self._session_factory() as session:
+            session.add(orm)
+            session.commit()
+            return AccountConfig(
+                id=orm.id, provider=orm.provider, label=orm.label,
+                address=orm.address, auth_type=orm.auth_type, auth_status=orm.auth_status,
+                created_at=orm.created_at,
+            )
+
+    def update_oauth_tokens(
+        self, account_id: str, *, refresh_token: str,
+        access_token: "str | None", token_expiry: "datetime | None", scopes: str,
+    ) -> None:
+        with self._session_factory() as session:
+            row = session.get(AccountConfigORM, account_id)
+            if row is None:
+                return
+            row.refresh_token = refresh_token
+            row.access_token = access_token
+            row.token_expiry = token_expiry
+            row.scopes = scopes
+            row.auth_status = "ok"
+            session.commit()
+
+    def set_auth_status(self, account_id: str, auth_status: str) -> None:
+        with self._session_factory() as session:
+            row = session.get(AccountConfigORM, account_id)
+            if row is None:
+                return
+            row.auth_status = auth_status
+            session.commit()
 
     def delete(self, account_id: str) -> bool:
         """削除. 見つかった場合 True, なければ False."""

@@ -13,6 +13,7 @@ from app.config import Settings
 from app.ports import Repository
 from app.repositories.account_repository import AccountRepository
 from app.services.ingestion import IngestionService
+from app.services.oauth_gmail import OAuthGmailService
 from app.services.state_service import StateService
 
 
@@ -34,6 +35,10 @@ def get_state_service(request: Request) -> StateService:
 
 def get_account_repo(request: Request) -> AccountRepository:
     return request.app.state.account_repo
+
+
+def get_oauth_service(request: Request) -> OAuthGmailService:
+    return request.app.state.oauth_service
 
 
 def require_auth(

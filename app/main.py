@@ -19,7 +19,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.analysis.factory import build_analyzer
-from app.api import routes_accounts, routes_emails, routes_messages
+from app.api import routes_accounts, routes_emails, routes_messages, routes_oauth
+from app.services.oauth_gmail import OAuthGmailService
 from app.config import get_settings
 from app.notify.factory import build_notifier
 from app.ports.errors import ConflictError, NotFoundError, TransitionError
@@ -56,6 +57,11 @@ async def lifespan(app: FastAPI):
     app.state.notifier = notifier
     app.state.ingestion = ingestion
     app.state.state_service = state_service
+    app.state.oauth_service = OAuthGmailService(
+        client_id=settings.gmail_oauth_client_id,
+        client_secret=settings.gmail_oauth_client_secret,
+        redirect_uri=settings.gmail_oauth_redirect_uri,
+    )
     app.state.scheduler = None
 
     # env 変数にアカウントが設定されていて DB に未登録なら自動登録する.
@@ -133,3 +139,4 @@ def health() -> dict:
 app.include_router(routes_emails.router)
 app.include_router(routes_messages.router)
 app.include_router(routes_accounts.router)
+app.include_router(routes_oauth.router)

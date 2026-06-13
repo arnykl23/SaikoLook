@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.adapters.sources.gmail_imap import GmailImapSource
 from app.adapters.sources.slack_api import SlackApiSource
-from app.api.deps import AuthDep, get_account_repo
+from app.api.deps import AuthDep, get_account_repo, get_repo
 from app.models import AccountConfig, AccountConfigCreate
+from app.ports import Repository
 from app.repositories.account_repository import AccountRepository
 
 router = APIRouter()
@@ -59,10 +60,14 @@ def create_account(
 def delete_account(
     account_id: str,
     repo: AccountRepository = Depends(get_account_repo),
+    msg_repo: Repository = Depends(get_repo),
 ) -> None:
-    found = repo.delete(account_id)
-    if not found:
+    account_orm = repo.get_by_id(account_id)
+    if account_orm is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="アカウントが見つかりません",
         )
+    if account_orm.address:
+        msg_repo.delete_by_account_address(account_orm.address)
+    repo.delete(account_id)

@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     # === Gmail（取得・正規化層）===
     gmail_address: str = ""
     gmail_app_password: str = ""
+    # OAuth フロー設定（アプリパスワード方式の代替）
+    gmail_oauth_client_id:     str = ""
+    gmail_oauth_client_secret: str = ""
+    gmail_oauth_redirect_uri:  str = "http://127.0.0.1:8000/auth/gmail/callback"
+    frontend_url:              str = "http://localhost:5173"
 
     # === DB（永続化層）===
     # 既定はローカル SQLite（追加アカウント不要）. Supabase/Postgres に上げる時は
