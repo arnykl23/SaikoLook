@@ -14,6 +14,7 @@ from app.ports import Repository
 from app.repositories.account_repository import AccountRepository
 from app.services.ingestion import IngestionService
 from app.services.oauth_gmail import OAuthGmailService
+from app.services.oauth_github import OAuthGithubService
 from app.services.state_service import StateService
 
 
@@ -39,6 +40,10 @@ def get_account_repo(request: Request) -> AccountRepository:
 
 def get_oauth_service(request: Request) -> OAuthGmailService:
     return request.app.state.oauth_service
+
+
+def get_github_oauth_service(request: Request) -> OAuthGithubService:
+    return request.app.state.github_oauth_service
 
 
 def require_auth(

@@ -19,8 +19,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.analysis.factory import build_analyzer
-from app.api import routes_accounts, routes_emails, routes_messages, routes_oauth
+from app.api import (
+    routes_accounts,
+    routes_emails,
+    routes_github_oauth,
+    routes_messages,
+    routes_oauth,
+)
 from app.services.oauth_gmail import OAuthGmailService
+from app.services.oauth_github import OAuthGithubService
 from app.config import get_settings
 from app.notify.factory import build_notifier
 from app.ports.errors import ConflictError, NotFoundError, TransitionError
@@ -61,6 +68,11 @@ async def lifespan(app: FastAPI):
         client_id=settings.gmail_oauth_client_id,
         client_secret=settings.gmail_oauth_client_secret,
         redirect_uri=settings.gmail_oauth_redirect_uri,
+    )
+    app.state.github_oauth_service = OAuthGithubService(
+        client_id=settings.github_oauth_client_id,
+        client_secret=settings.github_oauth_client_secret,
+        redirect_uri=settings.github_oauth_redirect_uri,
     )
     app.state.scheduler = None
 
@@ -140,3 +152,4 @@ app.include_router(routes_emails.router)
 app.include_router(routes_messages.router)
 app.include_router(routes_accounts.router)
 app.include_router(routes_oauth.router)
+app.include_router(routes_github_oauth.router)

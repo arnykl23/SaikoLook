@@ -75,7 +75,7 @@ class MessageRecord(BaseModel):
         return f"{provider}:{raw_id}"
 
 
-_SUPPORTED_PROVIDERS = {"gmail", "slack"}
+_SUPPORTED_PROVIDERS = {"gmail", "slack", "github"}
 
 
 class AccountConfig(BaseModel):

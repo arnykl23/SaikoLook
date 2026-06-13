@@ -98,6 +98,26 @@ npm run dev
 
 ---
 
+## GitHub 連携（OAuth App・読み取り専用）
+
+PR/Issue のレビュー依頼・メンション・コメント・アサインを取り込む。認証は OAuth App（classic）の `notifications` scope のみで，書込み権限は一切要求しない（GitHub App は Notifications API 非対応のため不採用）。
+
+1. **OAuth App を作成**: GitHub → Settings → Developer settings → OAuth Apps → New OAuth App
+   - Application name: 任意（例 `ReplyGuard`）
+   - Homepage URL: `http://localhost:5173`（本番は配置先のドメイン）
+   - **Authorization callback URL**: `http://127.0.0.1:8000/auth/github/callback`（本番は配置先に合わせる。`secrets/github.env` の `GITHUB_OAUTH_REDIRECT_URI` と一致させる）
+2. **Client ID と Client secret を発行**し，`secrets/github.env` に記入:
+
+   ```bash
+   cp secrets/github.env.example secrets/github.env
+   # GITHUB_OAUTH_CLIENT_ID=（発行された Client ID）
+   # GITHUB_OAUTH_CLIENT_SECRET=（生成した Client secret）
+   ```
+
+3. **接続**: ダッシュボードのアカウント設定で「GitHub」を選び「GitHub で接続」→ 認可画面で承認する。複数ユーザーがそれぞれ自分のアカウントを接続できる。
+
+> 要求するのは `notifications` scope のみ。通知は読み取るだけで，既読化・書込みは行わない。`secrets/github.env` は `.gitignore` 済み（コミット厳禁）。OAuth App のトークンは無期限（refresh token なし）で，失効時はダッシュボードから再接続する。
+
 ## データベースについて
 
 - 既定は **ローカル SQLite**（`sqlite:///./data/replyguard.db`）。資格情報は不要で，各自が自分のローカル DB を持つ。スキーマは起動時に自動作成される。
@@ -108,8 +128,9 @@ npm run dev
 
 | 項目 | 既定 | 用途 |
 |---|---|---|
-| `ANALYZER` | `stub` | `llm` にすると LLM 分析を使う（要 API キー，未設定なら stub にフォールバック） |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | 未設定 | LLM 分析の鍵 |
+| `ANALYZER` | `stub` | `gemini` / `anthropic` / `openai` で LLM 分析を使う（要 API キー，未設定なら stub にフォールバック）。分析は 1 メールにつき生涯 1 回だけ呼び，以降は保存済み結果を再利用する（従量課金の抑制） |
+| `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | 未設定 | LLM 分析の鍵（Gemini は無料枠あり） |
+| `LLM_MODEL` | 空（プロバイダ別既定） | 空なら自動（gemini→`gemini-2.5-flash-lite` 最安） |
 | `NOTIFIER` | `log` | `email` / `slack` で通知を実送信（要 SMTP/Webhook 設定） |
 | `AUTH_ENABLED` | `false` | `true` で JWT 認証を有効化（`JWT_SECRET` 必須） |
 | `DATABASE_URL` | ローカル SQLite | Postgres へ切替時に指定 |

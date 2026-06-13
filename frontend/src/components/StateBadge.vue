@@ -25,10 +25,12 @@ const label = computed(() => LABELS[props.state]);
   align-items: center;
   height: 22px;
   padding: 0 10px;
-  border-radius: 999px;
-  font-size: 12px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
   font-weight: 600;
   border: 1px solid transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .state-unhandled {
   color: var(--danger);
@@ -36,9 +38,9 @@ const label = computed(() => LABELS[props.state]);
   border-color: var(--danger);
 }
 .state-in_progress {
-  color: var(--accent);
+  color: var(--brand-blue);
   background: var(--accent-weak);
-  border-color: var(--accent);
+  border-color: var(--brand-blue);
 }
 .state-done {
   color: var(--success);
@@ -52,7 +54,7 @@ const label = computed(() => LABELS[props.state]);
 }
 .state-dismissed {
   color: var(--text-muted);
-  background: var(--bg);
+  background: var(--snow-surface);
   border-color: var(--border);
 }
 </style>

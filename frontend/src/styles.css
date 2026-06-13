@@ -1,27 +1,192 @@
+@import url('https://fonts.googleapis.com/css2?family=M+PLUS+1:wght@400;500;600;700;800&display=swap');
+
 :root {
-  /* design-spec light テーマ由来. 状態で色を分け, 装飾には使わない */
-  --bg: #f6f8fb;
-  --surface: #ffffff;
-  --border: #d8dee9;
-  --text: #1c2430;
-  --text-muted: #5a6678;
-  --accent: #2563eb;
-  --accent-weak: #eef3fb;
-  --success: #0f7a43;
-  --success-weak: #e9f7ef;
-  --warning: #946312;
-  --warning-weak: #fcf3e0;
-  --danger: #b42318;
-  --danger-weak: #fdecec;
+  /* Brand */
+  --brand-blue: #1A6ECC;
+  --brand-purple: #5A2EAA;
+  --brand-blue-light: #3A8EFF;
+  --brand-purple-light: #9A6EFF;
+  --brand-gradient: linear-gradient(135deg, #1A6ECC 0%, #5A2EAA 100%);
 
-  --radius: 6px;
+  /* Neutrals */
+  --snow-white: #F6F8FF;
+  --snow-surface: #EAF0FF;
+  --tundra-black: #100C08;
+  --tundra-surface: #2C2016;
+
+  /* Semantic */
+  --danger: #EA4335;
+  --danger-weak: #FDECEA;
+  --success: #2A7A4A;
+  --success-weak: #E6F4EC;
+  --warning: #B45309;
+  --warning-weak: #FEF3C7;
+
+  /* Typography */
+  --text: #0E0A20;
+  --text-dark: #EEE0CC;
+  --text-muted: #6B6880;
+
+  /* UI surfaces */
+  --bg: var(--snow-white);
+  --surface: #FFFFFF;
+  --border: #D0D8F0;
+  --accent: var(--brand-blue);
+  --accent-weak: var(--snow-surface);
+
+  /* Importance scale using brand palette */
+  --imp-1: #6B6880;
+  --imp-2: var(--brand-blue);
+  --imp-3: #B45309;
+  --imp-4: #C2410C;
+  --imp-5: var(--danger);
+
+  /* Shadows (from style guide) */
+  --shadow-lg: 0 4px 8px rgba(16, 12, 8, 0.15);
+  --shadow-md: 0 4px 8px rgba(16, 12, 8, 0.10);
+  --shadow-sm: 0 2px 4px rgba(16, 12, 8, 0.10);
+
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-pill: 999px;
   --gap: 12px;
+}
 
-  --imp-1: #5a6678;
-  --imp-2: #2563eb;
-  --imp-3: #946312;
-  --imp-4: #c2410c;
-  --imp-5: #b42318;
+html.dark {
+  --bg: #07050f;
+  --surface: #100d1e;
+  --border: #221e38;
+  --text: #EEE0CC;
+  --text-muted: #8880aa;
+  --accent-weak: #151028;
+  --snow-surface: #100d1e;
+  --snow-white: #07050f;
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.7);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.5);
+  /* gradient text for logo */
+  --brand-gradient-text: linear-gradient(135deg, #3A8EFF 0%, #9A6EFF 100%);
+}
+
+html.dark .bar {
+  background: #07050f !important;
+  border-bottom: 1px solid #221e38;
+  box-shadow: 0 1px 0 #221e38;
+}
+
+html.dark .logo {
+  background: var(--brand-gradient-text);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+html.dark .tag-line {
+  color: #8880aa;
+}
+
+/* Header buttons on dark need to work against black bg */
+html.dark .refresh,
+html.dark .auto-refresh-btn {
+  border-color: #221e38;
+  background: #100d1e;
+  color: #EEE0CC;
+}
+html.dark .refresh:hover,
+html.dark .auto-refresh-btn:hover {
+  background: #1a1530;
+}
+
+html.dark .ingest {
+  background: var(--brand-gradient-text);
+  color: #fff;
+  -webkit-text-fill-color: #fff;
+}
+
+html.dark .search-input {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #221e38;
+  color: #EEE0CC;
+}
+html.dark .search-input:focus {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: #3A8EFF;
+}
+html.dark .search-input::placeholder {
+  color: #8880aa;
+}
+
+/* ── Dark mode: semantic colours ── */
+html.dark {
+  --danger-weak: rgba(234, 67, 53, 0.15);
+  --success-weak: rgba(42, 122, 74, 0.15);
+  --warning-weak: rgba(180, 83, 9, 0.15);
+  --danger: #f87171;
+  --success: #4ade80;
+  --warning: #fb923c;
+}
+
+/* ── Dark mode: modal header ── */
+html.dark .modal-header {
+  background: #07050f;
+  border-bottom-color: #221e38;
+}
+html.dark .modal-title {
+  background: linear-gradient(135deg, #3A8EFF 0%, #9A6EFF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Dark mode: tag pills (MessageCard) ── */
+html.dark .tag {
+  background: #1a1530;
+  border-color: #2e2850;
+  color: #8880aa;
+}
+html.dark .tag.reply {
+  color: #3A8EFF;
+  border-color: #1e3a6e;
+  background: rgba(58, 142, 255, 0.12);
+}
+
+/* ── Dark mode: banners ── */
+html.dark .banner--success {
+  background: rgba(42, 122, 74, 0.12);
+  border-color: rgba(74, 222, 128, 0.35);
+  color: #4ade80;
+}
+html.dark .banner--warn {
+  background: rgba(180, 83, 9, 0.12);
+  border-color: rgba(251, 146, 60, 0.35);
+  color: #fb923c;
+}
+
+/* ── Dark mode: state badges ── */
+html.dark .state-unhandled {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #f87171;
+}
+html.dark .state-in_progress {
+  background: rgba(58, 142, 255, 0.12);
+  border-color: rgba(58, 142, 255, 0.4);
+  color: #3A8EFF;
+}
+html.dark .state-done {
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.35);
+  color: #4ade80;
+}
+html.dark .state-snoozed {
+  background: rgba(251, 146, 60, 0.1);
+  border-color: rgba(251, 146, 60, 0.35);
+  color: #fb923c;
+}
+html.dark .state-dismissed {
+  background: #1a1530;
+  border-color: #2e2850;
+  color: #8880aa;
 }
 
 * {
@@ -32,13 +197,14 @@ html,
 body {
   margin: 0;
   padding: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN",
-    "Noto Sans JP", Meiryo, sans-serif;
+  font-family: "M PLUS 1", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
   font-size: 14px;
   line-height: 1.5;
 }
@@ -48,9 +214,8 @@ button {
   cursor: pointer;
 }
 
-/* フォーカス可視化 (WCAG 2.1 AA) */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--brand-blue);
   outline-offset: 2px;
 }
 

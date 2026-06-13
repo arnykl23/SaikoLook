@@ -7,6 +7,8 @@ services:
     env_file:
       - path: ../secrets/gmail.env
         required: true
+      - path: ../secrets/github.env
+        required: false
       - path: ../secrets/app.env
         required: false
     command:

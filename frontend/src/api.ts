@@ -172,6 +172,27 @@ export async function reauthGmailAccount(accountId: string): Promise<OAuthStartR
   return res.json() as Promise<OAuthStartResponse>;
 }
 
+/** GitHub OAuth 認証フロー開始. address は不要（認可後に /user から取得）. */
+export async function startGithubOAuth(label: string): Promise<OAuthStartResponse> {
+  const params = new URLSearchParams({ label });
+  const res = await fetch(`${API_BASE}/auth/github/start?${params}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail ?? "OAuth 開始に失敗しました.");
+  }
+  return res.json() as Promise<OAuthStartResponse>;
+}
+
+/** GitHub OAuth 再認証 URL 取得. */
+export async function reauthGithubAccount(accountId: string): Promise<OAuthStartResponse> {
+  const res = await fetch(`${API_BASE}/auth/github/${accountId}/reauth`, { method: "POST" });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail ?? "再接続 URL の取得に失敗しました.");
+  }
+  return res.json() as Promise<OAuthStartResponse>;
+}
+
 /** 復元 (is_archived=false & state=unhandled に戻す). */
 export async function unarchiveMessage(messageId: string): Promise<MessageRecord> {
   const url = `${API_BASE}/messages/${encodeURIComponent(messageId)}/unarchive`;

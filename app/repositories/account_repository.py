@@ -56,6 +56,7 @@ class AccountRepository:
                     "credential": r.credential,  # 既存キー — 残す
                     "auth_type": r.auth_type or "imap",
                     "refresh_token": r.refresh_token,
+                    "access_token": r.access_token,
                     "auth_status": r.auth_status or "ok",
                 }
                 for r in rows
