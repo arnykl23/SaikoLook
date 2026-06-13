@@ -1,4 +1,4 @@
-import type { AccountConfig, AccountConfigCreate, MessageRecord, MessageState } from "./types";
+import type { AccountConfig, AccountConfigCreate, MessageRecord, MessageState, OAuthStartResponse } from "./types";
 
 const API_BASE = (
   import.meta.env.VITE_API_BASE ?? "http://localhost:8000"
@@ -146,6 +146,30 @@ export async function deleteAccount(id: string): Promise<void> {
     method: "DELETE",
   });
   if (!res.ok) throw new ApiError(await parseError(res), res.status);
+}
+
+/** Gmail OAuth 認証フロー開始. auth_url にリダイレクトさせる. */
+export async function startGmailOAuth(
+  label: string,
+  address: string
+): Promise<OAuthStartResponse> {
+  const params = new URLSearchParams({ label, address });
+  const res = await fetch(`${API_BASE}/auth/gmail/start?${params}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail ?? "OAuth 開始に失敗しました.");
+  }
+  return res.json() as Promise<OAuthStartResponse>;
+}
+
+/** Gmail OAuth 再認証 URL 取得. */
+export async function reauthGmailAccount(accountId: string): Promise<OAuthStartResponse> {
+  const res = await fetch(`${API_BASE}/auth/gmail/${accountId}/reauth`, { method: "POST" });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail ?? "再接続 URL の取得に失敗しました.");
+  }
+  return res.json() as Promise<OAuthStartResponse>;
 }
 
 /** 復元 (is_archived=false & state=unhandled に戻す). */

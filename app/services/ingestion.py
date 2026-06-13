@@ -8,6 +8,8 @@ IngestionService は AccountRepository からアカウントを取得し, プロ
 import logging
 from datetime import datetime, timezone
 
+import google.auth.exceptions
+from app.adapters.sources.gmail_api import GmailApiSource
 from app.adapters.sources.gmail_imap import GmailImapSource
 from app.adapters.sources.slack_api import SlackApiSource
 from app.config import Settings
@@ -41,14 +43,34 @@ class IngestionService:
         accounts = self._account_repo.list_for_ingest()
         sources = []
         for acc in accounts:
-            if acc["provider"] == "gmail":
-                sources.append(
-                    GmailImapSource(
-                        acc["address"],
-                        acc["credential"],
-                        max_body_chars=self._settings.llm_max_body_chars,
-                    )
+            # auth_status が ok 以外（reauth_required / revoked）ならスキップ
+            if acc.get("auth_status", "ok") not in ("ok", ""):
+                logger.warning(
+                    "アカウントスキップ (auth_status=%s, address=%s)",
+                    acc.get("auth_status"), acc.get("address"),
                 )
+                continue
+            if acc["provider"] == "gmail":
+                auth_type = acc.get("auth_type", "imap")
+                if auth_type == "oauth":
+                    sources.append(
+                        GmailApiSource(
+                            refresh_token=acc["refresh_token"],
+                            client_id=self._settings.gmail_oauth_client_id,
+                            client_secret=self._settings.gmail_oauth_client_secret,
+                            account_id=acc["id"],
+                            account_repo=self._account_repo,
+                            max_body_chars=self._settings.llm_max_body_chars,
+                        )
+                    )
+                else:
+                    sources.append(
+                        GmailImapSource(
+                            acc["address"],
+                            acc["credential"],
+                            max_body_chars=self._settings.llm_max_body_chars,
+                        )
+                    )
             elif acc["provider"] == "slack":
                 sources.append(
                     SlackApiSource(
@@ -87,10 +109,15 @@ class IngestionService:
         email_source_pairs: list[tuple] = []
         for source in sources:
             try:
-                for em in source.list_recent(self._settings.ingest_limit):
-                    email_source_pairs.append((em, source.address))
+                emails = source.list_recent(limit=self._settings.ingest_limit)
+            except google.auth.exceptions.RefreshError:
+                logger.warning("OAuth token 失効のためアカウントをスキップ（UI でリフレッシュ要）")
+                continue
             except Exception:
-                logger.exception("ingest: ソースの取得に失敗 address=%s", source.address)
+                logger.exception("取得失敗（継続）")
+                continue
+            for em in emails:
+                email_source_pairs.append((em, source.address))
 
         fetched = len(email_source_pairs)
         records: list[MessageRecord] = []

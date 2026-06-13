@@ -59,7 +59,14 @@ export interface AccountConfig {
   provider: string;
   label: string;
   address: string;
+  auth_type: string;    // 'imap' | 'oauth'
+  auth_status: string;  // 'ok' | 'reauth_required' | 'revoked'
   created_at: string | null;
+}
+
+export interface OAuthStartResponse {
+  auth_url: string;
+  state: string;
 }
 
 export interface AccountConfigCreate {

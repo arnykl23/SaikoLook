@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import type { AccountConfig, AccountConfigCreate } from "../types";
-import { getAccounts, createAccount, deleteAccount } from "../api";
+import { getAccounts, createAccount, deleteAccount, startGmailOAuth } from "../api";
 
 const emit = defineEmits<{
   "accounts-changed": [];
@@ -85,6 +85,30 @@ const credentialPlaceholder = computed(() =>
   selectedProvider.value === "slack" ? "xoxb-..." : "Google アプリパスワード（16桁）"
 );
 
+const oauthLoading = ref(false);
+const oauthError = ref<string | null>(null);
+
+async function onGoogleConnect(): Promise<void> {
+  oauthError.value = null;
+  if (!form.value.label.trim()) {
+    oauthError.value = "表示名を入力してください.";
+    return;
+  }
+  if (!form.value.address.trim()) {
+    oauthError.value = "メールアドレスを入力してください.";
+    return;
+  }
+  oauthLoading.value = true;
+  try {
+    const { auth_url } = await startGmailOAuth(form.value.label, form.value.address);
+    window.location.href = auth_url;
+  } catch (e) {
+    oauthError.value = e instanceof Error ? e.message : "OAuth 開始に失敗しました.";
+  } finally {
+    oauthLoading.value = false;
+  }
+}
+
 async function onSubmit(): Promise<void> {
   formError.value = null;
   if (!form.value.label.trim()) {
@@ -95,7 +119,7 @@ async function onSubmit(): Promise<void> {
     formError.value = `${addressLabel.value}を入力してください.`;
     return;
   }
-  if (!form.value.credential.trim()) {
+  if (selectedProvider.value !== "gmail" && !form.value.credential.trim()) {
     formError.value = `${credentialLabel.value}を入力してください.`;
     return;
   }
@@ -189,7 +213,7 @@ onMounted(() => {
 
         <!-- フォーム -->
         <p v-if="formError" class="banner err" role="alert">{{ formError }}</p>
-        <form class="form" @submit.prevent="onSubmit">
+        <form class="form" @submit.prevent="selectedProvider !== 'gmail' ? onSubmit() : undefined">
           <div class="field">
             <label class="label" for="account-label">表示名</label>
             <input
@@ -214,22 +238,35 @@ onMounted(() => {
               @input="onAddressInput"
             />
           </div>
-          <div class="field">
-            <label class="label" for="account-credential">{{ credentialLabel }}</label>
-            <input
-              id="account-credential"
-              v-model="form.credential"
-              type="password"
-              class="input"
-              :placeholder="credentialPlaceholder"
-              autocomplete="new-password"
-            />
-          </div>
-          <div class="form-footer">
-            <button type="submit" class="btn-primary" :disabled="submitting">
-              {{ submitting ? "追加中…" : "追加する" }}
+          <template v-if="selectedProvider !== 'gmail'">
+            <div class="field">
+              <label class="label" for="account-credential">{{ credentialLabel }}</label>
+              <input
+                id="account-credential"
+                v-model="form.credential"
+                type="password"
+                class="input"
+                :placeholder="credentialPlaceholder"
+                autocomplete="new-password"
+              />
+            </div>
+            <div class="form-footer">
+              <button type="submit" class="btn-primary" :disabled="submitting">
+                {{ submitting ? "追加中…" : "追加する" }}
+              </button>
+            </div>
+          </template>
+          <template v-if="selectedProvider === 'gmail'">
+            <button
+              type="button"
+              class="oauth-btn"
+              :disabled="oauthLoading"
+              @click="onGoogleConnect"
+            >
+              {{ oauthLoading ? "接続中..." : "Google アカウントで接続" }}
             </button>
-          </div>
+            <p v-if="oauthError" class="error-text">{{ oauthError }}</p>
+          </template>
         </form>
       </section>
     </div>
@@ -484,5 +521,27 @@ onMounted(() => {
   color: var(--text-muted);
   margin: 0;
   padding: 8px 0;
+}
+
+.oauth-btn {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--color-accent, #4285f4);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  font-size: 1rem;
+  margin-top: 0.5rem;
+}
+.oauth-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-text {
+  font-size: 13px;
+  color: var(--danger);
+  margin: 4px 0 0;
 }
 </style>
