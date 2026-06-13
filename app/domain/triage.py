@@ -5,8 +5,8 @@
 triage_score（推奨度）採点式:
     score = importance * (1 + urgency_score)
 
-- deadline なし (urgency=0.0): importance × 1.0 → 1〜5
-- 期限超過     (urgency=5.0): importance × 6.0 → 6〜30
+- deadline なし (urgency=0.0): importance × 1.0 → 1〜6
+- 期限超過     (urgency=5.0): importance × 6.0 → 6〜36
 - 0〜30日以内            : urgency が 4.5→0.5 に減衰するため線形補間
 
 urgency_score（緊急度）採点式:

@@ -67,7 +67,8 @@ const IMPORTANCE_OPTIONS: Array<{ value: number; label: string }> = [
   { value: 2, label: "2以上" },
   { value: 3, label: "3以上" },
   { value: 4, label: "4以上" },
-  { value: 5, label: "5のみ" },
+  { value: 5, label: "5以上" },
+  { value: 6, label: "6のみ" },
 ];
 
 function setImportanceMin(e: Event): void {

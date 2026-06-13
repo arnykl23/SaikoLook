@@ -11,7 +11,7 @@ OpenAI / Gemini / Ollama）の2系統で、どちらも `app/ports/analyzer.py` 
 class AnalysisResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    importance: int = Field(ge=1, le=5)                       # 重要度 1-5
+    importance: int = Field(ge=1, le=6)                       # 重要度 1-6
     task_weight: Literal["light", "medium", "heavy"] = "light"
     request_type: RequestType = "info_only"                   # 対応区分
     is_promotional: bool = False                              # 宣伝・広告・メルマガ等か
@@ -24,7 +24,7 @@ class AnalysisResult(BaseModel):
 
 | フィールド | 型 | 既定値 | 意味 |
 |---|---|---|---|
-| `importance` | `int` (1-5) | — | 重要度。5 が最重要。`domain/triage.py` の `triage_score` 計算に使う |
+| `importance` | `int` (1-6) | — | 重要度。6 が最重要。`domain/triage.py` の `triage_score` 計算に使う |
 | `task_weight` | `"light" \| "medium" \| "heavy"` | `"light"` | 対応にかかる手間の見積もり |
 | `request_type` | `RequestType`（6値、下記） | `"info_only"` | 対応区分（ファクト） |
 | `is_promotional` | `bool` | `False` | 宣伝・広告・メルマガ等の自動配信か |

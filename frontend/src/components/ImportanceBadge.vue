@@ -3,8 +3,8 @@ import { computed } from "vue";
 
 const props = defineProps<{ importance: number }>();
 
-const level = computed(() => Math.min(5, Math.max(1, props.importance)));
-const label = computed(() => `重要度 ${level.value} / 5`);
+const level = computed(() => Math.min(6, Math.max(1, props.importance)));
+const label = computed(() => `重要度 ${level.value} / 6`);
 </script>
 
 <template>
@@ -45,5 +45,8 @@ const label = computed(() => `重要度 ${level.value} / 5`);
 }
 .imp-5 {
   background: var(--imp-5);
+}
+.imp-6 {
+  background: var(--imp-6);
 }
 </style>

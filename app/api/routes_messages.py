@@ -51,7 +51,7 @@ def list_messages(
     descending: bool = Query(default=True),
     providers: list[str] = Query(default=[]),
     account_addresses: list[str] = Query(default=[]),
-    importance_min: int | None = Query(default=None, ge=1, le=5),
+    importance_min: int | None = Query(default=None, ge=1, le=6),
     received_after: datetime | None = Query(default=None),
     received_before: datetime | None = Query(default=None),
     repo: Repository = Depends(get_repo),

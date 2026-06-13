@@ -117,7 +117,7 @@ class StubAnalyzer:
         urgent_hits = [k for k in URGENT_KEYWORDS if k.lower() in haystack]
         promo_hits = [k for k in PROMO_KEYWORDS if k.lower() in haystack]
 
-        # 重要度: 基準 3 から, 締切/対応系で加点, 宣伝/通知系で減点, 1-5 にクランプ.
+        # 重要度: 基準 3 から, 締切/対応系で加点, 宣伝/通知系で減点, 1-6 にクランプ.
         importance = 3
         if urgent_hits:
             importance += 1
@@ -125,7 +125,7 @@ class StubAnalyzer:
                 importance += 1
         if promo_hits:
             importance -= 2
-        importance = max(1, min(5, importance))
+        importance = max(1, min(6, importance))
 
         needs_reply = bool(urgent_hits)
         is_promotional = bool(promo_hits and not urgent_hits)

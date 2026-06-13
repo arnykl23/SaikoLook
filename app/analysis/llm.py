@@ -7,7 +7,7 @@
 セキュリティ:
 - 本文を外部へ送るのは, ここでの正規の LLM API 呼び出しに限る.
 - API キー・本文をログに残さない（LLM02）. 失敗時も例外型名のみを記録する.
-- LLM 出力は信用せず AnalysisResult（extra="forbid", importance 1-5）で検証し,
+- LLM 出力は信用せず AnalysisResult（extra="forbid", importance 1-6）で検証し,
   範囲外・欠損・余計なキーは弾く（LLM05）.
 """
 
@@ -30,7 +30,7 @@ _MAX_TOKENS = 1024
 # AnalysisResult のうち LLM が出力するフィールドの JSON Schema（共通定義）.
 # "analyzer" は呼び出し側で上書きするため含めない.
 _RESPONSE_PROPERTIES: dict[str, Any] = {
-    "importance": {"type": "integer", "minimum": 1, "maximum": 5},
+    "importance": {"type": "integer", "minimum": 1, "maximum": 6},
     "task_weight": {"type": "string", "enum": ["light", "medium", "heavy"]},
     "request_type": {
         "type": "string",

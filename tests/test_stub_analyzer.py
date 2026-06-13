@@ -110,4 +110,4 @@ def test_deterministic_same_input_same_output():
 def test_importance_always_in_range():
     for subject in ("至急 至急 緊急 重要 締切 返信", "セール お知らせ 広告", "通常"):
         result = _analyze(subject=subject)
-        assert 1 <= result.importance <= 5
+        assert 1 <= result.importance <= 6

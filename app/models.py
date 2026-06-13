@@ -52,7 +52,7 @@ class AnalysisResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    importance: int = Field(ge=1, le=5)                       # 重要度 1-5
+    importance: int = Field(ge=1, le=6)                       # 重要度 1-6
     task_weight: Literal["light", "medium", "heavy"] = "light"
     request_type: RequestType = "info_only"                   # 対応区分
     is_promotional: bool = False                              # 宣伝・広告・メルマガ等か

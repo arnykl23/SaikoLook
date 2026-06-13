@@ -24,7 +24,7 @@ export type RequestType =
   | "info_only";
 
 export interface AnalysisResult {
-  importance: number; // 1-5
+  importance: number; // 1-6
   task_weight: TaskWeight;
   request_type: RequestType;
   is_promotional: boolean;

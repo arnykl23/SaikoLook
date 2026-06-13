@@ -180,6 +180,8 @@ def test_list_messages_importance_min_validation(api_client):
     resp = client.get("/messages", params={"importance_min": 0})
     assert resp.status_code == 422
     resp = client.get("/messages", params={"importance_min": 6})
+    assert resp.status_code == 200  # 6 は有効な最大値
+    resp = client.get("/messages", params={"importance_min": 7})
     assert resp.status_code == 422
 
 
