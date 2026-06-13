@@ -107,6 +107,12 @@ class IngestionService:
         """
         now = datetime.now(timezone.utc)
 
+        # 削除済みアカウントのメッセージを自動クリーンアップ
+        valid_addresses = [acc["address"] for acc in self._account_repo.list_for_ingest()]
+        cleaned = self._repo.delete_orphan_messages(valid_addresses)
+        if cleaned:
+            logger.info("ingest: 孤立メッセージ %d 件を自動削除", cleaned)
+
         source_pairs = self._build_sources()
         if not source_pairs:
             logger.info("ingest: アクティブなアカウントなし - スキップ")

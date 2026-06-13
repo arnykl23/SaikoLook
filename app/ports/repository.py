@@ -83,3 +83,7 @@ class Repository(Protocol):
     def delete_by_account_address(self, account_address: str) -> int:
         """指定アカウントアドレスのメッセージを全件削除して件数を返す."""
         ...
+
+    def delete_orphan_messages(self, valid_addresses: list[str]) -> int:
+        """有効アドレス一覧にないメッセージを全件削除して件数を返す."""
+        ...

@@ -186,6 +186,18 @@ class SqlRepository:
             session.commit()
             return result.rowcount
 
+    def delete_orphan_messages(self, valid_addresses: list[str]) -> int:
+        """有効アドレス一覧にないメッセージを全件削除する．起動時・ingest 時に孤立データを自動クリーンアップ．"""
+        if not valid_addresses:
+            return 0
+        stmt = delete(MessageRecordORM).where(
+            MessageRecordORM.account_address.not_in(valid_addresses)
+        )
+        with self._session_factory() as session:
+            result = session.execute(stmt)
+            session.commit()
+            return result.rowcount
+
     def set_archived(self, message_id: str, archived: bool) -> MessageRecord:
         """is_archived を更新する. 更新後のレコードを返す."""
         with self._session_factory() as session:
