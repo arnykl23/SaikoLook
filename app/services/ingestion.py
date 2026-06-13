@@ -41,7 +41,10 @@ class IngestionService:
     def _build_sources(self) -> list:
         """DB アカウントからソースを構築. なければ env 変数のフォールバックを試みる."""
         accounts = self._account_repo.list_for_ingest()
-        sources = []
+        # (source, account_address) ペアで返す．
+        # source.address に頼らず acc["address"] を使うことで OAuth アカウント（address="" を返す）でも
+        # account_address が正しく message_records に記録される．
+        source_pairs: list[tuple] = []
         for acc in accounts:
             # auth_status が ok 以外（reauth_required / revoked）ならスキップ
             if acc.get("auth_status", "ok") not in ("ok", ""):
@@ -50,10 +53,11 @@ class IngestionService:
                     acc.get("auth_status"), acc.get("address"),
                 )
                 continue
+            addr = acc["address"]
             if acc["provider"] == "gmail":
                 auth_type = acc.get("auth_type", "imap")
                 if auth_type == "oauth":
-                    sources.append(
+                    source_pairs.append((
                         GmailApiSource(
                             refresh_token=acc["refresh_token"],
                             client_id=self._settings.gmail_oauth_client_id,
@@ -61,35 +65,39 @@ class IngestionService:
                             account_id=acc["id"],
                             account_repo=self._account_repo,
                             max_body_chars=self._settings.llm_max_body_chars,
-                        )
-                    )
+                        ),
+                        addr,
+                    ))
                 else:
-                    sources.append(
+                    source_pairs.append((
                         GmailImapSource(
-                            acc["address"],
+                            addr,
                             acc["credential"],
                             max_body_chars=self._settings.llm_max_body_chars,
-                        )
-                    )
+                        ),
+                        addr,
+                    ))
             elif acc["provider"] == "slack":
-                sources.append(
+                source_pairs.append((
                     SlackApiSource(
                         acc["credential"],
-                        acc["address"],
+                        addr,
                         max_body_chars=self._settings.llm_max_body_chars,
-                    )
-                )
+                    ),
+                    addr,
+                ))
             # 将来: Outlook 等を追加
-        if not sources:
-            addr = self._settings.gmail_address
+        if not source_pairs:
+            env_addr = self._settings.gmail_address
             pw = self._settings.gmail_app_password
-            if addr and pw:
-                sources.append(
+            if env_addr and pw:
+                source_pairs.append((
                     GmailImapSource(
-                        addr, pw, max_body_chars=self._settings.llm_max_body_chars
-                    )
-                )
-        return sources
+                        env_addr, pw, max_body_chars=self._settings.llm_max_body_chars
+                    ),
+                    env_addr,
+                ))
+        return source_pairs
 
     def run_once(self) -> dict:
         """1 サイクル実行し件数を返す.
@@ -99,15 +107,14 @@ class IngestionService:
         """
         now = datetime.now(timezone.utc)
 
-        sources = self._build_sources()
-        if not sources:
+        source_pairs = self._build_sources()
+        if not source_pairs:
             logger.info("ingest: アクティブなアカウントなし - スキップ")
             return {"fetched": 0, "inserted": 0, "notified": 0}
 
-        # (email, source_address) のペアで収集し, 後段で source_address を正しく参照できるようにする.
-        # all_emails へ flatten してから source 変数を参照すると最後の source が全件に付く誤りが起きる.
+        # (email, account_address) のペアで収集する.
         email_source_pairs: list[tuple] = []
-        for source in sources:
+        for source, account_address in source_pairs:
             try:
                 emails = source.list_recent(limit=self._settings.ingest_limit)
             except google.auth.exceptions.RefreshError:
@@ -117,7 +124,7 @@ class IngestionService:
                 logger.exception("取得失敗（継続）")
                 continue
             for em in emails:
-                email_source_pairs.append((em, source.address))
+                email_source_pairs.append((em, account_address))
 
         fetched = len(email_source_pairs)
         records: list[MessageRecord] = []

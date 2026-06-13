@@ -202,10 +202,10 @@ onMounted(async () => {
     // アカウント追加直後に取り込みを自動実行してメールを即表示
     try {
       await triggerIngest();
-      await load();
-    } catch {
-      // 取り込み失敗は無視（次の自動更新で補完される）
+    } catch (e) {
+      console.error("自動取り込みに失敗（次回の自動更新で補完）:", e);
     }
+    await load(); // ingest の成否に関わらず必ずリスト更新
   }
 });
 
