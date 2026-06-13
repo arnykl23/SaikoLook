@@ -52,7 +52,7 @@ def oauth_callback(
         )
 
     try:
-        token_info = service.exchange_code(code)
+        token_info = service.exchange_code(code, flow=state_data.get("flow"))
     except Exception:
         logger.exception("OAuth code 交換に失敗 (state=%s)", state)
         return RedirectResponse(f"{settings.frontend_url}/?oauth_error=exchange_failed")

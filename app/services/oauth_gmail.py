@@ -28,14 +28,21 @@ class OAuthGmailService:
         self._pending_states: dict[str, dict] = {}
 
     def generate_auth_url(self, label: str, address: str) -> tuple[str, str]:
-        """認可 URL と state を生成．state → {label, address, ts} を in-memory キャッシュ．"""
+        """認可 URL と state を生成．state → {label, address, ts, flow} を in-memory キャッシュ．
+        PKCE コード検証子は Flow オブジェクト内に保持されるため，同じ Flow を exchange_code で再利用する必要がある．
+        """
         flow = self._make_flow()
         auth_url, state = flow.authorization_url(
             access_type="offline",
             include_granted_scopes="true",
             prompt="consent",
         )
-        self._pending_states[state] = {"label": label, "address": address, "ts": time.monotonic()}
+        self._pending_states[state] = {
+            "label": label,
+            "address": address,
+            "ts": time.monotonic(),
+            "flow": flow,  # PKCE 検証子を保持する Flow を保存
+        }
         return auth_url, state
 
     def pop_state(self, state: str) -> dict | None:
@@ -47,9 +54,12 @@ class OAuthGmailService:
             return None
         return entry
 
-    def exchange_code(self, code: str) -> dict:
-        """code をトークンに交換して {refresh_token, access_token, token_expiry, scopes} を返す．"""
-        flow = self._make_flow()
+    def exchange_code(self, code: str, flow: "Flow | None" = None) -> dict:
+        """code をトークンに交換して {refresh_token, access_token, token_expiry, scopes} を返す．
+        flow は generate_auth_url が生成した Flow を渡すこと（PKCE 検証子が含まれるため必須）．
+        """
+        if flow is None:
+            flow = self._make_flow()
         flow.fetch_token(code=code)
         creds = flow.credentials
         return {
