@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import type { AccountConfig, AccountConfigCreate } from "../types";
 import { getAccounts, createAccount, deleteAccount } from "../api";
 
@@ -70,6 +70,21 @@ function selectProvider(p: string): void {
   form.value.provider = p;
 }
 
+// --- プロバイダ別のフォーム表示 ---
+const addressLabel = computed(() =>
+  selectedProvider.value === "slack" ? "ワークスペース名" : "メールアドレス"
+);
+const addressPlaceholder = computed(() =>
+  selectedProvider.value === "slack" ? "例: my-team" : "you@gmail.com"
+);
+const addressInputType = computed(() => (selectedProvider.value === "slack" ? "text" : "email"));
+const credentialLabel = computed(() =>
+  selectedProvider.value === "slack" ? "Bot User OAuth Token" : "アプリパスワード"
+);
+const credentialPlaceholder = computed(() =>
+  selectedProvider.value === "slack" ? "xoxb-..." : "Google アプリパスワード（16桁）"
+);
+
 async function onSubmit(): Promise<void> {
   formError.value = null;
   if (!form.value.label.trim()) {
@@ -77,11 +92,11 @@ async function onSubmit(): Promise<void> {
     return;
   }
   if (!form.value.address.trim()) {
-    formError.value = "メールアドレスを入力してください.";
+    formError.value = `${addressLabel.value}を入力してください.`;
     return;
   }
   if (!form.value.credential.trim()) {
-    formError.value = "アプリパスワードを入力してください.";
+    formError.value = `${credentialLabel.value}を入力してください.`;
     return;
   }
   submitting.value = true;
@@ -158,9 +173,13 @@ onMounted(() => {
           >
             Gmail
           </button>
-          <button type="button" class="provider-btn" disabled>
+          <button
+            type="button"
+            class="provider-btn"
+            :class="{ active: selectedProvider === 'slack' }"
+            @click="selectProvider('slack')"
+          >
             Slack
-            <span class="soon-badge">近日公開</span>
           </button>
           <button type="button" class="provider-btn" disabled>
             Outlook
@@ -184,25 +203,25 @@ onMounted(() => {
             />
           </div>
           <div class="field">
-            <label class="label" for="account-address">メールアドレス</label>
+            <label class="label" for="account-address">{{ addressLabel }}</label>
             <input
               id="account-address"
               v-model="form.address"
-              type="email"
+              :type="addressInputType"
               class="input"
-              placeholder="you@gmail.com"
-              autocomplete="email"
+              :placeholder="addressPlaceholder"
+              autocomplete="off"
               @input="onAddressInput"
             />
           </div>
           <div class="field">
-            <label class="label" for="account-credential">アプリパスワード</label>
+            <label class="label" for="account-credential">{{ credentialLabel }}</label>
             <input
               id="account-credential"
               v-model="form.credential"
               type="password"
               class="input"
-              placeholder="Google アプリパスワード（16桁）"
+              :placeholder="credentialPlaceholder"
               autocomplete="new-password"
             />
           </div>

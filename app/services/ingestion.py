@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, timezone
 
 from app.adapters.sources.gmail_imap import GmailImapSource
+from app.adapters.sources.slack_api import SlackApiSource
 from app.config import Settings
 from app.domain.triage import compute_triage_score, compute_urgency_score
 from app.models import MessageRecord
@@ -48,7 +49,15 @@ class IngestionService:
                         max_body_chars=self._settings.llm_max_body_chars,
                     )
                 )
-            # 将来: Slack, Outlook 等を追加
+            elif acc["provider"] == "slack":
+                sources.append(
+                    SlackApiSource(
+                        acc["credential"],
+                        acc["address"],
+                        max_body_chars=self._settings.llm_max_body_chars,
+                    )
+                )
+            # 将来: Outlook 等を追加
         if not sources:
             addr = self._settings.gmail_address
             pw = self._settings.gmail_app_password
