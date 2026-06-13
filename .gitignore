@@ -64,6 +64,8 @@ patient*/
 .claude/.commit-msg-pending
 # MCP サーバ設定（個人ローカル・commit しない）
 .mcp.json
+# Playwright MCP のスナップショット等の生成物
+.playwright-mcp/
 # エージェント間共有ボード（中間生成物．README は残す）
 .claude/board/*
 !.claude/board/README.md
