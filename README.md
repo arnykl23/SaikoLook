@@ -108,8 +108,9 @@ npm run dev
 
 | 項目 | 既定 | 用途 |
 |---|---|---|
-| `ANALYZER` | `stub` | `llm` にすると LLM 分析を使う（要 API キー，未設定なら stub にフォールバック） |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | 未設定 | LLM 分析の鍵 |
+| `ANALYZER` | `stub` | `gemini` / `anthropic` / `openai` で LLM 分析を使う（要 API キー，未設定なら stub にフォールバック）。分析は 1 メールにつき生涯 1 回だけ呼び，以降は保存済み結果を再利用する（従量課金の抑制） |
+| `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | 未設定 | LLM 分析の鍵（Gemini は無料枠あり） |
+| `LLM_MODEL` | 空（プロバイダ別既定） | 空なら自動（gemini→`gemini-2.5-flash-lite` 最安） |
 | `NOTIFIER` | `log` | `email` / `slack` で通知を実送信（要 SMTP/Webhook 設定） |
 | `AUTH_ENABLED` | `false` | `true` で JWT 認証を有効化（`JWT_SECRET` 必須） |
 | `DATABASE_URL` | ローカル SQLite | Postgres へ切替時に指定 |

@@ -20,6 +20,7 @@ PyJWT
 httpx
 anthropic
 openai
+google-genai             # Gemini（新・統合SDK. 旧 google-generativeai は非推奨）
 
 # === OAuth/Gmail API 版（予備・現行の IMAP 経路では未使用） ===
 google-api-python-client

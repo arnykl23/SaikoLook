@@ -49,6 +49,17 @@ class FakeOpenAIClient:
         return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
 
+class FakeGeminiClient:
+    """client.models.generate_content(...) -> resp.text を模倣する（google-genai）."""
+
+    def __init__(self, text: str):
+        self._text = text
+        self.models = SimpleNamespace(generate_content=self._generate)
+
+    def _generate(self, **kwargs):
+        return SimpleNamespace(text=self._text)
+
+
 def _make_anthropic(text: str) -> LLMAnalyzer:
     return LLMAnalyzer(
         provider="anthropic",
@@ -71,6 +82,17 @@ def _make_openai(text: str) -> LLMAnalyzer:
     )
 
 
+def _make_gemini(text: str) -> LLMAnalyzer:
+    return LLMAnalyzer(
+        provider="gemini",
+        api_key="dummy",
+        model="gemini-2.5-flash-lite",
+        timeout_seconds=30,
+        max_body_chars=4000,
+        client=FakeGeminiClient(text),
+    )
+
+
 def test_anthropic_valid_json_parsed():
     result = _make_anthropic(VALID_JSON).analyze(make_email())
     assert result.importance == 5
@@ -84,6 +106,29 @@ def test_openai_valid_json_parsed():
     result = _make_openai(VALID_JSON).analyze(make_email())
     assert result.importance == 5
     assert result.analyzer == "openai"
+
+
+def test_gemini_valid_json_parsed():
+    result = _make_gemini(VALID_JSON).analyze(make_email())
+    assert result.importance == 5
+    assert result.needs_reply is True
+    assert result.task_weight == "heavy"
+    assert result.analyzer == "gemini"
+    assert result.deadline is not None
+
+
+def test_gemini_invalid_json_falls_back_to_stub():
+    result = _make_gemini("これは JSON ではありません").analyze(make_email())
+    assert result.analyzer == "stub"
+
+
+def test_gemini_extra_key_falls_back():
+    bad = VALID_JSON.replace(
+        '"reason": "締切が明示され対応が必要"',
+        '"reason": "x", "exec": "rm -rf /"',
+    )
+    result = _make_gemini(bad).analyze(make_email())
+    assert result.analyzer == "stub"
 
 
 def test_json_wrapped_in_code_fence_is_parsed():
@@ -146,7 +191,7 @@ def test_unsupported_provider_falls_back():
     assert result.analyzer == "stub"
 
 
-@pytest.mark.parametrize("factory", [_make_anthropic, _make_openai])
+@pytest.mark.parametrize("factory", [_make_anthropic, _make_openai, _make_gemini])
 def test_body_is_truncated_to_max_chars(factory):
     """max_body_chars を超える本文でもクラッシュせず動く（切り詰めの経路を踏む）."""
     analyzer = factory(VALID_JSON)

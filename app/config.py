@@ -59,11 +59,13 @@ class Settings(BaseSettings):
     ingest_limit: int = 10
 
     # === LLM 分析層 ===
-    # "stub"（既定・オフライン）| "anthropic" | "openai"
+    # "stub"（既定・オフライン）| "anthropic" | "openai" | "gemini"
     analyzer: str = "stub"
     anthropic_api_key: str = ""
     openai_api_key: str = ""
-    llm_model: str = "claude-sonnet-4-6"
+    gemini_api_key: str = ""
+    # 空ならプロバイダ別の既定モデルを factory が解決する（例 gemini→gemini-2.5-flash-lite）.
+    llm_model: str = ""
     llm_timeout_seconds: int = 30
     # 本文をLLMへ渡す際の最大文字数（コスト/漏洩面の上限）
     llm_max_body_chars: int = 4000

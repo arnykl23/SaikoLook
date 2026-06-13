@@ -33,6 +33,14 @@ const WEIGHT_LABELS: Record<string, string> = {
   heavy: "重",
 };
 
+// どの分析器が判定したか（説明可能性）. 未知の値はそのまま表示する.
+const ANALYZER_LABELS: Record<string, string> = {
+  gemini: "Gemini",
+  anthropic: "Claude",
+  openai: "GPT",
+  stub: "ルールベース",
+};
+
 const email = computed(() => props.record.email);
 const analysis = computed(() => props.record.analysis);
 
@@ -42,6 +50,10 @@ const category = computed(() => analysis.value?.category ?? "");
 const weightLabel = computed(() => {
   const w = analysis.value?.task_weight;
   return w ? (WEIGHT_LABELS[w] ?? w) : "";
+});
+const analyzerLabel = computed(() => {
+  const a = analysis.value?.analyzer;
+  return a ? (ANALYZER_LABELS[a] ?? a) : "";
 });
 
 const receivedAt = computed(() => {
@@ -112,6 +124,12 @@ const nextStates = computed(() =>
         <span v-if="category" class="tag">{{ category }}</span>
         <span v-if="weightLabel" class="tag weight">負荷 {{ weightLabel }}</span>
         <span v-if="analysis?.needs_reply" class="tag reply">要返信</span>
+        <span
+          v-if="analyzerLabel"
+          class="tag analyzer"
+          :title="`判定した分析器: ${analyzerLabel}`"
+          >🤖 {{ analyzerLabel }}</span
+        >
         <span class="tag triage" :title="`トリアージスコア ${triage}`">▲ {{ triage }}</span>
         <span class="expand-icon" :aria-hidden="true">{{ expanded ? "▲" : "▼" }}</span>
       </div>
@@ -281,6 +299,10 @@ const nextStates = computed(() =>
 }
 .tag.triage {
   color: var(--text-muted);
+}
+.tag.analyzer {
+  color: var(--text-muted);
+  font-variant: tabular-nums;
 }
 .expand-icon {
   margin-left: auto;

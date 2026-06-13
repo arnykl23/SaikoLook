@@ -3,6 +3,12 @@
 IngestionService は AccountRepository からアカウントを取得し, プロバイダごとに
 ソースを動的に構築してメールを取得する. 1 通の失敗で全体を落とさず, 個別に
 握り込んでログへ残す（観測性）. 本文全文はログ・例外詳細に出さない（LLM02）.
+
+分析（LLM）は 1 メールにつき原則 1 回だけ呼ぶ（従量課金の抑制）. ただし再利用する
+のは「現行アナライザが出した結果」に限る: レート上限超過などで前回 stub へフォール
+バックした結果は確定扱いにせず, 次サイクルで本来のアナライザに昇格させる（取り残し
+防止）. 成功後は同一結果を再利用し再課金しない. 期限に依存する triage/urgency
+スコアは純粋関数で安価なため, 毎サイクル now で再計算する.
 """
 
 import logging
@@ -38,6 +44,9 @@ class IngestionService:
         self._repo = repo
         self._notifier = notifier
         self._settings = settings
+        # テスト用のソース注入口. セットされていれば DB/env 由来の構築を完全に置き換える
+        # （実 Gmail/Slack を叩かずオフライン e2e できるようにするため）.
+        self._sources_override: list | None = None
 
     def _build_sources(self) -> list:
         """DB アカウントからソースを構築. なければ env 変数のフォールバックを試みる.
@@ -46,7 +55,13 @@ class IngestionService:
         acc_dict は list_for_ingest() の dict（id / provider / address / ... を含む）.
         source.address に頼らず acc["address"] を使うことで OAuth アカウント
         （GmailApiSource.address が "" を返す）でも account_address が正しく記録される.
+
+        テスト用に _sources_override がセットされていれば DB/env 由来の構築を完全に
+        置き換える（実 Gmail/Slack を叩かずオフライン e2e するため）. override も
+        (source, acc_dict) ペアの list を返すこと.
         """
+        if self._sources_override is not None:
+            return self._sources_override
         accounts = self._account_repo.list_for_ingest()
         source_pairs: list[tuple] = []
         for acc in accounts:
@@ -141,13 +156,32 @@ class IngestionService:
         records: list[MessageRecord] = []
         is_new_by_id: dict[str, bool] = {}
 
+        # 現行アナライザの識別ラベル（LLM は provider, それ以外は name, 既定 "stub"）.
+        # このラベルと一致する保存済み結果だけを再利用する. 前回レート上限等で stub に
+        # フォールバックした結果は一致しないため, 次サイクルで本来のアナライザに昇格する.
+        expected_analyzer = (
+            getattr(self._analyzer, "provider", None)
+            or getattr(self._analyzer, "name", None)
+            or "stub"
+        )
+
         for email, source_address in email_source_pairs:
             message_id = MessageRecord.make_id(email.provider, email.id)
             try:
-                analysis = self._analyzer.analyze(email)
+                existing = self._repo.get(message_id)
+                # 分析は原則 1 回（従量課金の抑制）. ただし再利用は現行アナライザの結果に
+                # 限り, 前回フォールバックした stub 等は再分析して昇格させる.
+                # スコアは now 依存のため毎回ローカルで再計算する（無料）.
+                if (
+                    existing is not None
+                    and existing.analysis is not None
+                    and existing.analysis.analyzer == expected_analyzer
+                ):
+                    analysis = existing.analysis
+                else:
+                    analysis = self._analyzer.analyze(email)
                 urgency = compute_urgency_score(analysis, now)
                 score = compute_triage_score(analysis, now)
-                existing = self._repo.get(message_id)
                 record = MessageRecord(
                     message_id=message_id,
                     email=email,

@@ -70,6 +70,8 @@ class LLMAnalyzer:
             return self._call_anthropic(content)
         if self.provider == "openai":
             return self._call_openai(content)
+        if self.provider == "gemini":
+            return self._call_gemini(content)
         raise ValueError(f"未対応の provider: {self.provider}")
 
     def _call_anthropic(self, content: str) -> str:
@@ -103,6 +105,29 @@ class LLMAnalyzer:
             ],
         )
         return resp.choices[0].message.content
+
+    def _call_gemini(self, content: str) -> str:
+        client = self._client
+        if client is None:
+            from google import genai  # 遅延 import（未導入なら ImportError → フォールバック）
+
+            # timeout は http_options でミリ秒指定（SDK 仕様）.
+            client = genai.Client(
+                api_key=self._api_key,
+                http_options={"timeout": self.timeout_seconds * 1000},
+            )
+        # response_mime_type で必ず JSON を返させる. 出力は下の _parse + AnalysisResult で
+        # 再検証するため, ここではスキーマを強制せず素の JSON を受け取る（LLM05: 信用しない）.
+        resp = client.models.generate_content(
+            model=self.model,
+            contents=content,
+            config={
+                "system_instruction": SYSTEM_INSTRUCTION,
+                "max_output_tokens": _MAX_TOKENS,
+                "response_mime_type": "application/json",
+            },
+        )
+        return resp.text
 
     @staticmethod
     def _parse(raw: str) -> dict[str, Any]:
