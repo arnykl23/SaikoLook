@@ -10,7 +10,7 @@ tzinfo=UTC を再付与して aware な datetime として返す（SQLite が tz
 
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import sessionmaker
 
 from app.domain.fsm import assert_transition
@@ -176,6 +176,15 @@ class SqlRepository:
         with self._session_factory() as session:
             rows = session.execute(stmt).scalars().all()
             return [_to_record(r) for r in rows]
+
+    def delete_by_account_address(self, account_address: str) -> int:
+        stmt = delete(MessageRecordORM).where(
+            MessageRecordORM.account_address == account_address
+        )
+        with self._session_factory() as session:
+            result = session.execute(stmt)
+            session.commit()
+            return result.rowcount
 
     def set_archived(self, message_id: str, archived: bool) -> MessageRecord:
         """is_archived を更新する. 更新後のレコードを返す."""

@@ -94,13 +94,10 @@ async function onGoogleConnect(): Promise<void> {
     oauthError.value = "表示名を入力してください.";
     return;
   }
-  if (!form.value.address.trim()) {
-    oauthError.value = "メールアドレスを入力してください.";
-    return;
-  }
   oauthLoading.value = true;
   try {
-    const { auth_url } = await startGmailOAuth(form.value.label, form.value.address);
+    // アドレスは Google 認証後にプロフィール API から自動取得するため空で渡す
+    const { auth_url } = await startGmailOAuth(form.value.label, "");
     window.location.href = auth_url;
   } catch (e) {
     oauthError.value = e instanceof Error ? e.message : "OAuth 開始に失敗しました.";
@@ -226,7 +223,7 @@ onMounted(() => {
               @input="onLabelInput"
             />
           </div>
-          <div class="field">
+          <div v-if="selectedProvider !== 'gmail'" class="field">
             <label class="label" for="account-address">{{ addressLabel }}</label>
             <input
               id="account-address"

@@ -79,3 +79,7 @@ class Repository(Protocol):
     def list_providers(self) -> list[str]:
         """DB に存在する distinct な provider 一覧をアルファベット順で返す."""
         ...
+
+    def delete_by_account_address(self, account_address: str) -> int:
+        """指定アカウントアドレスのメッセージを全件削除して件数を返す."""
+        ...

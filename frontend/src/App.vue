@@ -199,6 +199,13 @@ onMounted(async () => {
     oauthSuccessBanner.value = true;
     window.history.replaceState({}, "", window.location.pathname);
     await refreshAccountStatus();
+    // アカウント追加直後に取り込みを自動実行してメールを即表示
+    try {
+      await triggerIngest();
+      await load();
+    } catch {
+      // 取り込み失敗は無視（次の自動更新で補完される）
+    }
   }
 });
 
