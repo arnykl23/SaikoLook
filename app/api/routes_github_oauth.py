@@ -69,13 +69,10 @@ def oauth_callback(
         logger.exception("GitHub ユーザー情報取得失敗（address は空のまま）")
         address = ""
 
-    repo.create_oauth(
-        provider="github",
+    repo.upsert_github_oauth(
         label=state_data.get("label", address or "github"),
         address=address,
-        refresh_token="",  # GitHub OAuth App は refresh token を発行しない
         access_token=access_token,
-        token_expiry=None,
         scopes=token_info.get("scopes", ""),
     )
     return RedirectResponse(f"{settings.frontend_url}/?oauth_success=1")

@@ -126,14 +126,14 @@ function onOverlayClick(e: MouseEvent): void {
 
 // Provider catalogue — fixed list, enriched with connected account if any
 const PROVIDERS = [
-  { id: "gmail",   label: "Gmail",   color: "#EA4335", soon: false },
-  { id: "github",  label: "GitHub",  color: "#24292e", soon: false },
-  { id: "slack",   label: "Slack",   color: "#4A154B", soon: false },
-  { id: "outlook", label: "Outlook", color: "#0078D4", soon: true  },
-] as const;
+  { id: "gmail",   label: "Gmail",   color: "#EA4335", soon: false, maxAccounts: Infinity },
+  { id: "github",  label: "GitHub",  color: "#24292e", soon: false, maxAccounts: 1 },
+  { id: "slack",   label: "Slack",   color: "#4A154B", soon: false, maxAccounts: Infinity },
+  { id: "outlook", label: "Outlook", color: "#0078D4", soon: true,  maxAccounts: 1 },
+] satisfies { id: string; label: string; color: string; soon: boolean; maxAccounts: number }[];
 
-function connectedAccount(provider: string): AccountConfig | undefined {
-  return accounts.value.find((a) => a.provider.toLowerCase() === provider);
+function connectedAccounts(provider: string): AccountConfig[] {
+  return accounts.value.filter((a) => a.provider.toLowerCase() === provider);
 }
 
 onMounted(() => { void loadAccounts(); });
@@ -183,39 +183,53 @@ onMounted(() => { void loadAccounts(); });
             <!-- Name + status -->
             <div class="provider-info">
               <span class="provider-name">{{ p.label }}</span>
-              <span v-if="connectedAccount(p.id)" class="provider-status connected">接続済み</span>
+              <span v-if="connectedAccounts(p.id).length > 0" class="provider-status connected">
+                {{ connectedAccounts(p.id).length }}件接続済み
+              </span>
               <span v-else-if="p.soon" class="provider-status soon">近日公開</span>
               <span v-else class="provider-status disconnected">未接続</span>
             </div>
 
-            <!-- Account label if connected -->
-            <span v-if="connectedAccount(p.id)" class="provider-account-label">
-              {{ connectedAccount(p.id)!.label }}
-            </span>
+            <div style="flex: 1" />
 
-            <!-- Action button -->
+            <!-- Add button: shown unless soon or maxAccounts reached -->
             <button
-              v-if="connectedAccount(p.id)"
-              type="button"
-              class="action-btn disconnect-btn"
-              :disabled="deletingId === connectedAccount(p.id)!.id"
-              @click="onDelete(connectedAccount(p.id)!.id)"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-            <button
-              v-else-if="!p.soon"
+              v-if="!p.soon && connectedAccounts(p.id).length < p.maxAccounts"
               type="button"
               class="action-btn connect-btn"
               :class="{ active: expandedProvider === p.id }"
+              :aria-label="`${p.label} アカウントを追加`"
               @click="toggleExpand(p.id)"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
             </button>
+          </div>
+
+          <!-- Connected accounts list -->
+          <div v-if="connectedAccounts(p.id).length > 0" class="account-list">
+            <div
+              v-for="account in connectedAccounts(p.id)"
+              :key="account.id"
+              class="account-row"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" class="account-check">
+                <path d="M20 6L9 17l-5-5"/>
+              </svg>
+              <span class="account-row-label">{{ account.label }}</span>
+              <button
+                type="button"
+                class="action-btn disconnect-btn"
+                :disabled="deletingId === account.id"
+                :aria-label="`${account.label} を切断`"
+                @click="onDelete(account.id)"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
           <!-- Inline connect form -->
@@ -379,14 +393,37 @@ onMounted(() => { void loadAccounts(); });
 .provider-status.disconnected { color: var(--text-muted); }
 .provider-status.soon { color: var(--text-muted); }
 
-.provider-account-label {
+/* ── Connected accounts list ── */
+.account-list {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.account-row:last-child {
+  border-bottom: none;
+}
+
+.account-check {
+  color: var(--success);
+  flex-shrink: 0;
+}
+
+.account-row-label {
   flex: 1;
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 13px;
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: right;
 }
 
 .action-btn {

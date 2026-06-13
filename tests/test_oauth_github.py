@@ -114,6 +114,7 @@ def test_exchange_code_returns_access_token() -> None:
     """access_token を含む dict を返すこと."""
     svc = _svc()
     mock_resp = MagicMock()
+    mock_resp.status_code = 200
     mock_resp.json.return_value = {
         "access_token": "gho_testtoken123",
         "scope": "notifications",
@@ -140,6 +141,7 @@ def test_exchange_code_raises_on_missing_access_token() -> None:
     """access_token が欠落したレスポンスで RuntimeError を送出すること."""
     svc = _svc()
     mock_resp = MagicMock()
+    mock_resp.status_code = 200
     mock_resp.json.return_value = {
         "error": "bad_verification_code",
         "error_description": "The code passed is incorrect or expired.",
@@ -154,6 +156,7 @@ def test_exchange_code_error_message_does_not_leak_secret() -> None:
     """RuntimeError のメッセージに client_secret が含まれないこと（秘密情報非漏洩）."""
     svc = _svc()
     mock_resp = MagicMock()
+    mock_resp.status_code = 200
     mock_resp.json.return_value = {"error": "bad_code"}
 
     with patch("httpx.post", return_value=mock_resp):
