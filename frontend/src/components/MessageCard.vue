@@ -150,36 +150,11 @@ const isMaxImportance = computed(() => importance.value >= 6);
 // プロバイダ（アプリ）ごとにカードの縁色を変える
 const providerClass = computed(() => `card--${(email.value.provider || "").toLowerCase()}`);
 
-// ── オーバーフローメニュー ──
-// 主要アクション: done（✓完了）・snoozed（⏸保留）
-// 残りは ⋯ メニューへ: in_progress・dismissed（archive）
-const overflowOpen = ref(false);
-
-function toggleOverflow(e: MouseEvent | KeyboardEvent) {
-  e.stopPropagation();
-  overflowOpen.value = !overflowOpen.value;
-}
-
-function closeOverflow() {
-  overflowOpen.value = false;
-}
-
-// ⋯メニューが開いている状態で外部クリックで閉じる（document listener）
-function handleOverflowBlur(e: FocusEvent) {
-  const related = e.relatedTarget as HTMLElement | null;
-  // フォーカスがオーバーフローメニュー内に留まる場合は閉じない
-  if (related && related.closest(".overflow-menu")) return;
-  overflowOpen.value = false;
-}
-
-// 状態遷移ハンドラ（emit は既存のまま）
 function onChangeState(s: MessageState) {
-  closeOverflow();
   emit("change-state", s);
 }
 
 function onArchive() {
-  closeOverflow();
   emit("archive");
 }
 
@@ -304,10 +279,14 @@ const REQUEST_TYPES: { value: RequestType; label: string }[] = [
           <time v-if="receivedAt" class="received" :title="receivedAtFull" :datetime="email.received_at ?? undefined">{{ receivedAt }}</time>
         </div>
 
-        <!-- 右端: 状態ピル + 未読ドット -->
+        <!-- 右端: 状態ピル + 展開シェブロン -->
         <div class="top-right">
           <StateBadge :state="record.state" />
-          <span v-if="email.is_unread" class="unread-dot" title="未読" aria-label="未読" />
+          <span class="expand-icon" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline :points="expanded ? '18 15 12 9 6 15' : '6 9 12 15 18 9'" />
+            </svg>
+          </span>
         </div>
       </div>
 
@@ -358,11 +337,6 @@ const REQUEST_TYPES: { value: RequestType; label: string }[] = [
           :title="`判定した分析器: ${analyzerLabel}`"
           >🤖 {{ analyzerLabel }}</span
         >
-        <span class="expand-icon" aria-hidden="true">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline :points="expanded ? '18 15 12 9 6 15' : '6 9 12 15 18 9'" />
-          </svg>
-        </span>
       </div>
     </div>
 
@@ -416,62 +390,36 @@ const REQUEST_TYPES: { value: RequestType; label: string }[] = [
           保留
         </button>
 
-        <!-- ⋯ オーバーフローメニュー -->
-        <div class="overflow-wrap">
-          <button
-            type="button"
-            class="act act--overflow"
-            :disabled="busy"
-            :aria-expanded="overflowOpen"
-            aria-haspopup="true"
-            title="その他の操作"
-            aria-label="その他の操作"
-            @click="toggleOverflow"
-            @keydown.esc="closeOverflow"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-              <circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>
-            </svg>
-          </button>
+        <!-- 対応中 -->
+        <button
+          type="button"
+          class="act act--in-progress"
+          :class="{ 'act--active': record.state === 'in_progress' }"
+          :disabled="busy"
+          title="対応中にする"
+          aria-label="対応中にする"
+          @click="onChangeState(record.state === 'in_progress' ? 'unhandled' : 'in_progress')"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+          対応中
+        </button>
 
-          <Transition name="menu">
-            <div
-              v-if="overflowOpen"
-              class="overflow-menu glass"
-              role="menu"
-              @focusout="handleOverflowBlur"
-            >
-              <!-- 対応中に戻す -->
-              <button
-                type="button"
-                class="menu-item"
-                :class="{ 'menu-item--active': record.state === 'in_progress' }"
-                role="menuitem"
-                :disabled="busy"
-                @click="onChangeState(record.state === 'in_progress' ? 'unhandled' : 'in_progress')"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                </svg>
-                {{ record.state === 'in_progress' ? '未対応に戻す' : '対応中にする' }}
-              </button>
-
-              <!-- 対象外（archive） -->
-              <button
-                type="button"
-                class="menu-item menu-item--dismiss"
-                role="menuitem"
-                :disabled="busy"
-                @click="onArchive"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>
-                </svg>
-                対象外にする
-              </button>
-            </div>
-          </Transition>
-        </div>
+        <!-- 対象外（archive） -->
+        <button
+          type="button"
+          class="act act--dismiss"
+          :disabled="busy"
+          title="対象外にする"
+          aria-label="対象外にする"
+          @click="onArchive"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>
+          </svg>
+          対象外
+        </button>
       </template>
 
       <!-- 判定の修正（フィードバック） -->
@@ -591,8 +539,10 @@ const REQUEST_TYPES: { value: RequestType; label: string }[] = [
   flex-direction: column;
   gap: 10px;
   transition:
-    box-shadow var(--dur-base) var(--ease-out-expo),
-    transform var(--dur-base) var(--ease-spring);
+    box-shadow 373ms var(--ease-out-expo),
+    transform 200ms var(--ease-spring),
+    padding 200ms var(--ease-out-expo),
+    gap 200ms var(--ease-out-expo);
   position: relative;
   will-change: transform;
 }
@@ -617,6 +567,10 @@ const REQUEST_TYPES: { value: RequestType; label: string }[] = [
 
 /* プロバイダ別の縁色（アプリの違いを一目で） */
 .card--gmail.glass   { border-color: var(--ocean); } /* Google → 青 */
+.card--gmail .avatar,
+.card--gmail .avatar-check { border-radius: 50%; }
+.card--slack .avatar,
+.card--slack .avatar-check { border-radius: 7px; }
 .card--github.glass  { border-color: var(--leaf); }  /* GitHub → 緑 */
 .card--slack.glass   { border-color: var(--sand); }  /* Slack → 黄 */
 .card--outlook.glass { border-color: var(--sage); }  /* Outlook → 鼠 */
@@ -624,10 +578,10 @@ const REQUEST_TYPES: { value: RequestType; label: string }[] = [
 /* hover：派手に弾んで持ち上がる（枠/影は出さず・白いまま） */
 .card:hover {
   box-shadow: none;
-  transform: translateY(-7px) scale(1.015);
+  transform: scale(1.015);
 }
 .card:active {
-  transform: translateY(-2px) scale(0.995);
+  transform: scale(0.995);
 }
 
 .card.compact {
@@ -743,14 +697,11 @@ const REQUEST_TYPES: { value: RequestType; label: string }[] = [
   flex: 1;
   min-width: 0;
   color: var(--text-muted);
-  font-size: 12px;
-  overflow: hidden;
+  font-size: 13px;
+  flex-wrap: wrap;
 }
 .sender {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 220px;
+  word-break: break-all;
 }
 .provider {
   white-space: nowrap;
@@ -764,19 +715,12 @@ const REQUEST_TYPES: { value: RequestType; label: string }[] = [
   flex-shrink: 0;
 }
 
-/* 右端: 状態ピル + 未読ドット */
+/* 右端: 状態ピル + 展開シェブロン */
 .top-right {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-}
-.unread-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--ocean);
-  flex: none;
 }
 
 /* ── Row 2: 件名 + 重要度サイコロ ── */
@@ -913,14 +857,13 @@ const REQUEST_TYPES: { value: RequestType; label: string }[] = [
 
 /* セキュリティ通知: leaf 強調 */
 .tag--security {
-  color: var(--ocean);
-  border-color: var(--leaf);
-  background: var(--leaf-weak);
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--red-12);
   font-weight: 600;
 }
 
 .expand-icon {
-  margin-left: auto;
   font-size: 10px;
   color: var(--text-muted);
   opacity: 0.45;
@@ -994,9 +937,9 @@ const REQUEST_TYPES: { value: RequestType; label: string }[] = [
 /* ⏸ 保留 */
 .act--snoozed:hover:not(:disabled),
 .act--snoozed.act--active {
-  border-color: var(--sage);
-  color: var(--ocean);
-  background: var(--sage-weak);
+  border-color: var(--mauve);
+  color: var(--mauve);
+  background: var(--mauve-weak);
 }
 .act--snoozed.act--active {
   font-weight: 600;
@@ -1023,76 +966,22 @@ const REQUEST_TYPES: { value: RequestType; label: string }[] = [
   font-weight: 600;
 }
 
-/* ⋯ オーバーフロートリガー（アイコンボタン: scale のみ） */
-.act--overflow {
-  padding: 4px 8px;
+/* 対応中 */
+.act--in-progress:hover:not(:disabled),
+.act--in-progress.act--active {
+  border-color: var(--sand);
+  color: #C88A00;
+  background: var(--sand-weak);
 }
-.act--overflow:hover:not(:disabled) {
-  transform: scale(1.15);
-}
-.act--overflow:active:not(:disabled) {
-  transform: scale(0.9);
-}
-
-/* ── オーバーフローメニュー ── */
-.overflow-wrap {
-  position: relative;
-  margin-left: auto;
-}
-
-/* ガラスメニュー本体（.glass は backdrop-filter を担う） */
-.overflow-menu {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  right: 0;
-  min-width: 152px;
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  z-index: 300;
-  /* .glass が border-radius を設定するが上書きして小さめに */
-  border-radius: var(--radius-sm) !important;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  padding: 7px 10px;
-  border-radius: 10px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  text-align: left;
-  transition:
-    background var(--dur-fast) var(--ease-out-expo),
-    color var(--dur-fast) var(--ease-out-expo),
-    transform var(--dur-fast) var(--ease-spring);
-  white-space: nowrap;
-}
-.menu-item:hover:not(:disabled) {
-  background: var(--ocean-12);
-  color: var(--ocean);
-  transform: translateY(-1px) scale(1.03);
-}
-.menu-item:active:not(:disabled) {
-  transform: scale(0.94);
-}
-.menu-item--active {
-  color: var(--ocean);
-  background: var(--ocean-08);
+.act--in-progress.act--active {
   font-weight: 600;
 }
-.menu-item--dismiss:hover:not(:disabled) {
-  background: var(--sage-weak);
+
+/* 対象外（archive） */
+.act--dismiss:hover:not(:disabled) {
+  border-color: var(--sage);
   color: var(--ocean);
-}
-.menu-item:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+  background: var(--sage-weak);
 }
 
 /* ── メニュー出現アニメーション（fade + translateY/scale, out-expo） ── */
@@ -1123,13 +1012,13 @@ const REQUEST_TYPES: { value: RequestType; label: string }[] = [
 /* ── 展開アニメーション（opacity + transform, out-expo で統一） ── */
 .expand-enter-active {
   transition:
-    opacity var(--dur-base) var(--ease-out-expo),
-    transform var(--dur-base) var(--ease-spring);
+    opacity 160ms var(--ease-out-expo),
+    transform 160ms var(--ease-spring);
 }
 .expand-leave-active {
   transition:
-    opacity var(--dur-fast) var(--ease-out-expo),
-    transform var(--dur-fast) var(--ease-out-expo);
+    opacity 160ms var(--ease-out-expo),
+    transform 160ms var(--ease-out-expo);
 }
 .expand-enter-from,
 .expand-leave-to {

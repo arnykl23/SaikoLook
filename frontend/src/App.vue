@@ -81,7 +81,7 @@ function updateFavicon(count: number): void {
   ctx.fillText("R", 16, 17);
   // Badge dot (bottom-right, no number — tab title already shows count)
   if (count > 0) {
-    ctx.fillStyle = "#049DBF";
+    ctx.fillStyle = "#E05252";
     ctx.beginPath();
     ctx.arc(26, 26, 5, 0, Math.PI * 2);
     ctx.fill();
@@ -343,11 +343,7 @@ async function switchTab(tab: Tab): Promise<void> {
     const alreadyLoaded = tab === "inbox" ? inboxLoaded.value : archiveLoaded.value;
     if (!alreadyLoaded) await loadTab(tab);
   };
-  if (document.startViewTransition) {
-    document.startViewTransition(() => go());
-  } else {
-    await go();
-  }
+  await go();
 }
 
 async function onIngest(): Promise<void> {
@@ -597,9 +593,12 @@ function onKeydown(e: KeyboardEvent): void {
 
 // --- Sidebar collapse ---
 const sidebarCollapsed = ref(localStorage.getItem("sidebarCollapsed") === "true");
+const sidebarToggling = ref(false);
 function toggleSidebar(): void {
+  sidebarToggling.value = true;
   sidebarCollapsed.value = !sidebarCollapsed.value;
   localStorage.setItem("sidebarCollapsed", String(sidebarCollapsed.value));
+  setTimeout(() => { sidebarToggling.value = false; }, 50);
 }
 
 // --- Scroll to top ---
@@ -1088,7 +1087,7 @@ onUnmounted(() => {
         v-else
         tag="div"
         name="list"
-        class="list"
+        :class="['list', { 'list--no-move': sidebarToggling }]"
       >
         <MessageCard
           v-for="(r, i) in displayedRecords"
@@ -1329,10 +1328,12 @@ onUnmounted(() => {
   top: calc(100% + 10px);
   right: 0;
   min-width: 210px;
-  /* glass クラスのみに依存：background/backdrop/shadow/radius を上書きしない */
   border-radius: var(--radius-sm) !important;
   z-index: 200;
   overflow: hidden;
+  background: var(--white) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 .dropdown-section {
   padding: 4px 0;
@@ -1369,10 +1370,10 @@ onUnmounted(() => {
 }
 .dropdown-item:active { transform: translateX(2px) scale(0.98); }
 .dropdown-item--danger {
-  color: var(--ocean);
+  color: var(--red);
 }
 .dropdown-item--danger:hover {
-  background: var(--ocean-12);
+  background: var(--red-12);
 }
 .dropdown-dot {
   margin-left: auto;
@@ -1496,15 +1497,15 @@ onUnmounted(() => {
 .tab-badge {
   font-size: 11px;
   font-weight: 700;
-  background: var(--white);
-  color: var(--ocean);
+  background: var(--red);
+  color: var(--white);
   border-radius: var(--radius-pill);
   padding: 1px 6px;
   min-width: 18px;
   text-align: center;
 }
 .tab.active .tab-badge {
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--red);
   color: var(--white);
 }
 
@@ -1559,7 +1560,7 @@ onUnmounted(() => {
 /* ── Main content ── */
 .main {
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
   margin-top: 16px;
   display: grid;
   grid-template-columns: 200px 1fr;
@@ -1602,7 +1603,7 @@ onUnmounted(() => {
 .sidebar-toggle:active { transform: scale(0.95); }
 
 .sidebar-content {
-  overflow: hidden;
+  overflow: visible;
   transition: opacity 0.2s ease;
 }
 
@@ -1668,7 +1669,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 50px;
+  height: 50px;
   position: sticky;
   top: 0;
   z-index: 5;
@@ -1748,8 +1749,8 @@ onUnmounted(() => {
 .bulk-btn--leaf { color: var(--ocean); border-color: var(--leaf); background: var(--leaf-weak); }
 .bulk-btn--leaf:hover { background: var(--leaf); color: var(--white); border-color: var(--leaf); }
 /* sage（保留・受信トレイに戻す） */
-.bulk-btn--sage { color: var(--ocean); border-color: var(--sage); background: var(--sage-weak); }
-.bulk-btn--sage:hover { background: var(--sage); color: var(--white); border-color: var(--sage); }
+.bulk-btn--sage { color: var(--mauve); border-color: var(--mauve); background: var(--mauve-weak); }
+.bulk-btn--sage:hover { background: var(--mauve); color: var(--white); border-color: var(--mauve); }
 /* clear（キャンセル） */
 .bulk-btn--clear { color: var(--text-muted); border-color: transparent; background: none; }
 .bulk-btn--clear:hover { color: var(--ocean); border-color: var(--ocean); background: var(--ocean-12); }
@@ -1802,14 +1803,17 @@ onUnmounted(() => {
   100% { transform: scale(1); }
 }
 
-/* 未対応ヒーロー stat（件数があれば ocean 淡地で強調） */
-.stat-btn--hero-on {
-  border-color: var(--ocean) !important;
-  background: var(--ocean-12) !important;
-}
+/* 未対応ヒーロー stat */
 .stat-btn--hero-on .stat-value {
-  color: var(--ocean);
-  font-weight: 800;
+  color: var(--red);
+}
+.stat-btn--hero.stat-btn--active {
+  border-color: var(--red) !important;
+  background: var(--red-12) !important;
+}
+.stat-btn--hero.stat-btn--active .stat-value,
+.stat-btn--hero.stat-btn--active .stat-label {
+  color: var(--red);
 }
 
 /* stat-btn：状態別（常に ocean 文字・枠と地で色を示す） */
@@ -1821,32 +1825,46 @@ onUnmounted(() => {
 .stat-btn--active .stat-label {
   color: var(--ocean);
 }
-/* sand（対応中） */
+/* sand（対応中）— amber */
+.stat-btn--sand .stat-value {
+  color: #C88A00;
+}
 .stat-btn--sand.stat-btn--active {
   border-color: var(--sand) !important;
   background: var(--sand-weak) !important;
+}
+.stat-btn--sand.stat-btn--active .stat-value,
+.stat-btn--sand.stat-btn--active .stat-label {
+  color: #C88A00;
 }
 /* leaf（完了） */
 .stat-btn--leaf.stat-btn--active {
   border-color: var(--leaf) !important;
   background: var(--leaf-weak) !important;
 }
-/* sage（保留） */
+/* mauve（保留） */
+.stat-btn--sage .stat-value {
+  color: var(--mauve);
+}
 .stat-btn--sage.stat-btn--active {
-  border-color: var(--sage) !important;
-  background: var(--sage-weak) !important;
+  border-color: var(--mauve) !important;
+  background: var(--mauve-weak) !important;
+}
+.stat-btn--sage.stat-btn--active .stat-value,
+.stat-btn--sage.stat-btn--active .stat-label {
+  color: var(--mauve);
 }
 /* 期限切れ（ocean 塗り反転＝最強シグナル） */
 .stat-btn--overdue-active {
-  border-color: var(--ocean) !important;
+  border-color: var(--red) !important;
 }
 .stat-btn--overdue-active .stat-value {
-  color: var(--ocean);
+  color: var(--red);
   font-weight: 800;
 }
 .stat-btn--overdue.stat-btn--active {
-  background: var(--ocean) !important;
-  border-color: var(--ocean) !important;
+  background: var(--red) !important;
+  border-color: var(--red) !important;
 }
 .stat-btn--overdue.stat-btn--active .stat-value,
 .stat-btn--overdue.stat-btn--active .stat-label {
@@ -1876,7 +1894,7 @@ onUnmounted(() => {
   border: 1.5px solid var(--leaf);
 }
 .banner--warn {
-  border: 1.5px solid var(--sand);
+  border: 1.5px solid var(--red);
 }
 .banner button {
   margin-left: auto;
@@ -1987,15 +2005,16 @@ onUnmounted(() => {
 
 /* TransitionGroup FLIP（ゆっくり浮き出てくる＝ヌルヌル） */
 .list-move {
-  transition: transform 1800ms var(--ease-out-expo);
+  transition: transform 480ms var(--ease-out-expo);
+}
+.list--no-move .list-move {
+  transition: none;
 }
 .list-enter-active {
-  transition: opacity 2000ms var(--ease-out-expo), transform 2000ms var(--ease-spring);
+  transition: opacity 480ms var(--ease-out-expo), transform 1333ms var(--ease-spring);
 }
 .list-leave-active {
-  transition: opacity 520ms var(--ease-out-expo), transform 520ms var(--ease-out-expo);
-  position: absolute;
-  width: 100%;
+  transition: opacity 200ms var(--ease-out-expo), transform 200ms var(--ease-out-expo);
 }
 .list-enter-from {
   opacity: 0;
@@ -2003,7 +2022,7 @@ onUnmounted(() => {
 }
 .list-leave-to {
   opacity: 0;
-  transform: translateX(-30px) scale(0.94);
+  transform: scale(0.97);
 }
 
 /* stagger：--i CSS 変数で出現を遅延（ゆったり順番に） */

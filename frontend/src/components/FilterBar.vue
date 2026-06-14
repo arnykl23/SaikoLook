@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, nextTick } from "vue";
+import { computed, ref } from "vue";
 import type { MessagesQuery } from "../api";
 import type { AccountConfig } from "../types";
 
@@ -125,93 +125,21 @@ function diceKeydown(e: KeyboardEvent, face: number): void {
 const diceFocusRef = ref<HTMLElement | null>(null);
 
 // ────────────────────────────────────────────────────────
-// §3 受信日時 — トリガーチップ＋カレンダーポップオーバー
+// §3 受信日時 — インライン date input
 // ────────────────────────────────────────────────────────
-const afterPopoverOpen = ref(false);
-const beforePopoverOpen = ref(false);
-const afterInputRef = ref<HTMLInputElement | null>(null);
-const beforeInputRef = ref<HTMLInputElement | null>(null);
-const afterTriggerRef = ref<HTMLElement | null>(null);
-const beforeTriggerRef = ref<HTMLElement | null>(null);
-const afterPopoverRef = ref<HTMLElement | null>(null);
-const beforePopoverRef = ref<HTMLElement | null>(null);
-
 function toDateInput(iso: string | undefined): string {
   return iso ? iso.slice(0, 10) : "";
 }
 
-function formatDateLabel(iso: string | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
-
-function openAfterPopover(): void {
-  beforePopoverOpen.value = false;
-  afterPopoverOpen.value = true;
-  nextTick(() => { afterInputRef.value?.focus(); });
-}
-function closeAfterPopover(): void { afterPopoverOpen.value = false; }
-
-function openBeforePopover(): void {
-  afterPopoverOpen.value = false;
-  beforePopoverOpen.value = true;
-  nextTick(() => { beforeInputRef.value?.focus(); });
-}
-function closeBeforePopover(): void { beforePopoverOpen.value = false; }
-
 function setReceivedAfter(e: Event): void {
   const v = (e.target as HTMLInputElement).value;
   patch({ received_after: v ? `${v}T00:00:00Z` : undefined });
-  if (v) closeAfterPopover();
 }
 
 function setReceivedBefore(e: Event): void {
   const v = (e.target as HTMLInputElement).value;
   patch({ received_before: v ? `${v}T23:59:59Z` : undefined });
-  if (v) closeBeforePopover();
 }
-
-function clearAfter(e: Event): void {
-  e.stopPropagation();
-  patch({ received_after: undefined });
-  afterPopoverOpen.value = false;
-}
-
-function clearBefore(e: Event): void {
-  e.stopPropagation();
-  patch({ received_before: undefined });
-  beforePopoverOpen.value = false;
-}
-
-// click outside handler for popovers
-function handleDocClick(e: MouseEvent): void {
-  const target = e.target as Node;
-  if (
-    afterPopoverOpen.value &&
-    !afterTriggerRef.value?.contains(target) &&
-    !afterPopoverRef.value?.contains(target)
-  ) {
-    closeAfterPopover();
-  }
-  if (
-    beforePopoverOpen.value &&
-    !beforeTriggerRef.value?.contains(target) &&
-    !beforePopoverRef.value?.contains(target)
-  ) {
-    closeBeforePopover();
-  }
-}
-
-function popoverKeydown(e: KeyboardEvent, which: "after" | "before"): void {
-  if (e.key === "Escape") {
-    if (which === "after") { closeAfterPopover(); afterTriggerRef.value?.focus(); }
-    else { closeBeforePopover(); beforeTriggerRef.value?.focus(); }
-  }
-}
-
-onMounted(() => { document.addEventListener("mousedown", handleDocClick); });
-onUnmounted(() => { document.removeEventListener("mousedown", handleDocClick); });
 
 // ────────────────────────────────────────────────────────
 // §4 未読のみ — トグルチップ（role="switch"）
@@ -391,130 +319,33 @@ const groupedAccounts = computed(() => {
     <div class="divider" role="separator" aria-hidden="true" />
 
     <!-- ══════════════════════════════
-         §3 受信日時 — チップ＋ポップオーバー
+         §3 受信日時 — インライン date input
          ══════════════════════════════ -->
     <section class="filter-section" aria-labelledby="date-label">
       <div id="date-label" class="section-label">受信日時</div>
-      <div class="date-chips-row">
-
-        <!-- After チップ -->
-        <div class="date-chip-wrap">
-          <button
-            ref="afterTriggerRef"
-            type="button"
-            class="date-chip"
-            :class="{ 'date-chip--active': !!modelValue.received_after }"
-            :aria-expanded="afterPopoverOpen"
-            aria-haspopup="dialog"
-            aria-controls="after-popover"
-            :aria-label="modelValue.received_after
-              ? `after: ${formatDateLabel(modelValue.received_after)}、変更`
-              : '受信日時（from）を設定'"
-            @click="afterPopoverOpen ? closeAfterPopover() : openAfterPopover()"
-          >
-            <span v-if="modelValue.received_after">
-              after: {{ formatDateLabel(modelValue.received_after) }}
-            </span>
-            <span v-else class="date-placeholder">from…</span>
-            <button
-              v-if="modelValue.received_after"
-              type="button"
-              class="chip-clear-btn"
-              aria-label="after フィルターを解除"
-              @click="clearAfter"
-            >×</button>
-          </button>
-
-          <!-- After ポップオーバー -->
-          <Transition name="popover">
-            <div
-              v-if="afterPopoverOpen"
-              id="after-popover"
-              ref="afterPopoverRef"
-              class="date-popover glass"
-              role="dialog"
-              aria-modal="false"
-              aria-label="受信日時（from）を選択"
-              @keydown="popoverKeydown($event, 'after')"
-            >
-              <div class="popover-label">from（以降）</div>
-              <input
-                ref="afterInputRef"
-                type="date"
-                class="popover-date-input"
-                :value="toDateInput(modelValue.received_after)"
-                aria-label="受信日時 from"
-                @change="setReceivedAfter"
-              />
-              <button
-                type="button"
-                class="popover-close-btn"
-                aria-label="閉じる"
-                @click="closeAfterPopover"
-              >閉じる</button>
-            </div>
-          </Transition>
-        </div>
-
-        <!-- Before チップ -->
-        <div class="date-chip-wrap">
-          <button
-            ref="beforeTriggerRef"
-            type="button"
-            class="date-chip"
-            :class="{ 'date-chip--active': !!modelValue.received_before }"
-            :aria-expanded="beforePopoverOpen"
-            aria-haspopup="dialog"
-            aria-controls="before-popover"
-            :aria-label="modelValue.received_before
-              ? `before: ${formatDateLabel(modelValue.received_before)}、変更`
-              : '受信日時（to）を設定'"
-            @click="beforePopoverOpen ? closeBeforePopover() : openBeforePopover()"
-          >
-            <span v-if="modelValue.received_before">
-              before: {{ formatDateLabel(modelValue.received_before) }}
-            </span>
-            <span v-else class="date-placeholder">to…</span>
-            <button
-              v-if="modelValue.received_before"
-              type="button"
-              class="chip-clear-btn"
-              aria-label="before フィルターを解除"
-              @click="clearBefore"
-            >×</button>
-          </button>
-
-          <!-- Before ポップオーバー -->
-          <Transition name="popover">
-            <div
-              v-if="beforePopoverOpen"
-              id="before-popover"
-              ref="beforePopoverRef"
-              class="date-popover glass"
-              role="dialog"
-              aria-modal="false"
-              aria-label="受信日時（to）を選択"
-              @keydown="popoverKeydown($event, 'before')"
-            >
-              <div class="popover-label">to（以前）</div>
-              <input
-                ref="beforeInputRef"
-                type="date"
-                class="popover-date-input"
-                :value="toDateInput(modelValue.received_before)"
-                aria-label="受信日時 to"
-                @change="setReceivedBefore"
-              />
-              <button
-                type="button"
-                class="popover-close-btn"
-                aria-label="閉じる"
-                @click="closeBeforePopover"
-              >閉じる</button>
-            </div>
-          </Transition>
-        </div>
-
+      <div class="date-inputs-col">
+        <label class="date-input-row">
+          <span class="date-input-label">from</span>
+          <input
+            type="date"
+            class="date-input"
+            :class="{ 'date-input--active': !!modelValue.received_after }"
+            :value="toDateInput(modelValue.received_after)"
+            aria-label="受信日時 from"
+            @change="setReceivedAfter"
+          />
+        </label>
+        <label class="date-input-row">
+          <span class="date-input-label">to</span>
+          <input
+            type="date"
+            class="date-input"
+            :class="{ 'date-input--active': !!modelValue.received_before }"
+            :value="toDateInput(modelValue.received_before)"
+            aria-label="受信日時 to"
+            @change="setReceivedBefore"
+          />
+        </label>
       </div>
     </section>
 
@@ -773,6 +604,7 @@ const groupedAccounts = computed(() => {
   align-items: center;
   flex-wrap: nowrap;
   gap: 6px;
+  overflow: visible;
 }
 
 .dice-group {
@@ -781,6 +613,7 @@ const groupedAccounts = computed(() => {
   display: flex;
   flex-wrap: nowrap;
   gap: 5px;
+  overflow: visible;
 }
 
 .dice-all-btn {
@@ -846,12 +679,12 @@ const groupedAccounts = computed(() => {
 }
 
 /* 重要度ランプ — face ごとに pip 色が変わる */
-.dice-face--imp1 .pip { fill: var(--sage); }
-.dice-face--imp2 .pip { fill: var(--ocean-50); }
-.dice-face--imp3 .pip { fill: var(--ocean-72); }
-.dice-face--imp4 .pip { fill: var(--ocean); }
-.dice-face--imp5 .pip { fill: var(--ocean); }
-.dice-face--imp6 .pip { fill: var(--ocean); }
+.dice-face--imp1 .pip { fill: #7A9490; }
+.dice-face--imp2 .pip { fill: var(--leaf); }
+.dice-face--imp3 .pip { fill: #2BBFA8; }
+.dice-face--imp4 .pip { fill: #2B7FBF; }
+.dice-face--imp5 .pip { fill: #4B5BBF; }
+.dice-face--imp6 .pip { fill: #6B3BAF; }
 
 /* しきい値以上に選択されている面 */
 .dice-face--gte {
@@ -884,159 +717,50 @@ const groupedAccounts = computed(() => {
   min-height: 16px;
 }
 
-/* ── §3 日付チップ＋ポップオーバー ── */
-.date-chips-row {
+/* ── §3 日付インライン入力 ── */
+.date-inputs-col {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.date-chip-wrap {
-  position: relative;
-}
-
-.date-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--ocean);
-  background: var(--mist);
-  border: 1.5px solid var(--sage-weak);
-  border-radius: var(--radius-pill);
-  padding: 5px 12px;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-  transition: background var(--dur-fast) var(--ease-out-expo),
-              border-color var(--dur-fast) var(--ease-out-expo),
-              box-shadow var(--dur-fast) var(--ease-out-expo),
-              transform 120ms var(--ease-spring);
-}
-.date-chip:hover {
-  background: var(--ocean-08);
-  border-color: var(--ocean-20);
-  transform: translateY(-1px) scale(1.02);
-  box-shadow: 0 3px 8px var(--ocean-08);
-}
-.date-chip:active {
-  transform: scale(0.97) !important;
-  box-shadow: none;
-}
-.date-chip--active {
-  background: var(--ocean-12);
-  border-color: var(--ocean-20);
-  font-weight: 600;
-}
-
-.date-placeholder {
-  color: var(--ocean);
-  font-style: italic;
-}
-
-.chip-clear-btn {
-  margin-left: auto;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ocean);
-  background: none;
-  border: none;
-  padding: 0 0 0 4px;
-  cursor: pointer;
-  line-height: 1;
-  flex-shrink: 0;
-  transition: color var(--dur-fast) var(--ease-out-expo),
-              transform 120ms var(--ease-spring),
-              opacity var(--dur-fast) var(--ease-out-expo);
-}
-.chip-clear-btn:hover {
-  color: var(--ocean);
-  transform: scale(1.12);
-  opacity: 0.85;
-}
-.chip-clear-btn:active {
-  transform: scale(0.9) !important;
-}
-
-/* ポップオーバー */
-.date-popover {
-  position: absolute;
-  left: 0;
-  top: calc(100% + 6px);
-  z-index: 100;
+.date-input-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding: 12px 14px;
-  min-width: 180px;
-  /* glass はグローバルユーティリティ適用済み */
-  border-radius: var(--radius-sm) !important;
+  cursor: default;
 }
 
-.popover-label {
+.date-input-label {
   font-size: 11px;
   font-weight: 700;
   color: var(--ocean);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  width: 22px;
+  flex-shrink: 0;
 }
 
-.popover-date-input {
-  font-size: 13px;
+.date-input {
+  font-size: 12px;
   font-family: inherit;
   color: var(--ocean);
   background: var(--mist);
   border: 1.5px solid var(--sage-weak);
   border-radius: var(--radius-sm);
-  padding: 5px 8px;
-  width: 100%;
+  padding: 4px 7px;
+  width: 130px;
   transition: border-color var(--dur-fast);
 }
-.popover-date-input:focus {
+.date-input:focus {
   border-color: var(--ocean);
   outline: 3px solid var(--ocean-12);
   outline-offset: 1px;
 }
-
-.popover-close-btn {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--ocean);
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  text-align: right;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  transition: opacity var(--dur-fast) var(--ease-out-expo),
-              transform 120ms var(--ease-spring);
-}
-.popover-close-btn:hover {
-  opacity: 0.75;
-  transform: scale(1.05);
-}
-.popover-close-btn:active {
-  transform: scale(0.94);
-}
-
-/* ポップオーバー トランジション — fadeY(-4px→0)，out-expo */
-.popover-enter-active {
-  animation: popover-in 150ms var(--ease-out-expo) both;
-}
-.popover-leave-active {
-  animation: popover-in 120ms var(--ease-out-expo) reverse both;
-}
-@keyframes popover-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.date-input--active {
+  border-color: var(--ocean-20);
+  background: var(--ocean-08);
 }
 
 /* ── §4 トグルチップ（role="switch"） ── */

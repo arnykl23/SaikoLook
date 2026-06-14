@@ -61,14 +61,14 @@ const label = computed(() => LABELS[props.state]);
   transition: background var(--dur-fast) var(--ease-out-expo);
 }
 
-/* unhandled（未対応）= ocean: 最も目立つ・要対応 */
+/* unhandled（未対応）= red: 最も目立つ・要対応 */
 .state-unhandled {
-  background: var(--ocean-12);
-  border-color: var(--ocean);
-  color: var(--ocean);
+  background: var(--red-12);
+  border-color: var(--red);
+  color: var(--red);
 }
 .state-unhandled::before {
-  background: var(--ocean);
+  background: var(--red);
 }
 
 /* in_progress（対応中）= sand */
@@ -91,14 +91,14 @@ const label = computed(() => LABELS[props.state]);
   background: var(--leaf);
 }
 
-/* snoozed（保留）= sage */
+/* snoozed（保留）= mauve */
 .state-snoozed {
-  background: var(--sage-weak);
-  border-color: var(--sage);
-  color: var(--ocean);
+  background: var(--mauve-weak);
+  border-color: var(--mauve);
+  color: var(--mauve);
 }
 .state-snoozed::before {
-  background: var(--sage);
+  background: var(--mauve);
 }
 
 /* dismissed（対象外）= sage 退色: opacity .6 で「盤面から外れた」質感 */

@@ -42,9 +42,18 @@
   --tundra-black: var(--ocean);
   --tundra-surface: var(--mist);
 
-  /* ── 意味色（赤を使わず ocean 塗りで強さを出す） ── */
-  --danger: var(--ocean);
-  --danger-weak: var(--ocean-12);
+  /* ── 赤（緊急・要注意専用） ── */
+  --red:       #E05252;
+  --red-12:    rgba(224, 82, 82, 0.12);
+  --red-20:    rgba(224, 82, 82, 0.20);
+
+  /* ── モーブ（保留専用） ── */
+  --mauve:      #B07090;
+  --mauve-weak: rgba(176, 112, 144, 0.18);
+
+  /* ── 意味色 ── */
+  --danger: var(--red);
+  --danger-weak: var(--red-12);
   --success: var(--leaf);
   --success-weak: var(--leaf-weak);
   --warning: var(--sand);
@@ -62,13 +71,13 @@
   --accent: var(--ocean);
   --accent-weak: var(--ocean-12);
 
-  /* ── 重要度ランプ（1-2=灰 / 3-4=青 / 5=緑 / 6=黄） ── */
-  --imp-1: var(--sage);
-  --imp-2: var(--sage);
-  --imp-3: var(--ocean);
-  --imp-4: var(--ocean);
-  --imp-5: var(--leaf);
-  --imp-6: var(--sand);
+  /* ── 重要度ランプ（1=灰緑 / 2=緑 / 3=青緑 / 4=青 / 5=藍 / 6=深紫） ── */
+  --imp-1: #7A9490;
+  --imp-2: var(--leaf);
+  --imp-3: #2BBFA8;
+  --imp-4: #2B7FBF;
+  --imp-5: #4B5BBF;
+  --imp-6: #6B3BAF;
 
   /* ══════════ Liquid Glass トークン ══════════ */
   /* 明るいフロストガラス（既定カード．mist/白の半透明＝ocean文字が読める明surface） */
