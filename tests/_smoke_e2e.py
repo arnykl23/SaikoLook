@@ -11,7 +11,7 @@ import os
 import tempfile
 
 # ── app を import する前に隔離設定を効かせる（settings は import 時に読まれる）──
-_TMP_DB = os.path.join(tempfile.gettempdir(), "replyguard_smoke.db")
+_TMP_DB = os.path.join(tempfile.gettempdir(), "SaikoLook_smoke.db")
 if os.path.exists(_TMP_DB):
     os.remove(_TMP_DB)
 os.environ["DATABASE_URL"] = f"sqlite:///{_TMP_DB}"

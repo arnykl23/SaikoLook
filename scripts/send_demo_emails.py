@@ -166,7 +166,7 @@ def main() -> None:
         print(f"送信件数: {len(DEMO_EMAILS)} 件\n")
         _send_batch(DEMO_EMAILS)
 
-    print("\n完了。ReplyGuard で ingest を実行してください。")
+    print("\n完了。SaikoLook で ingest を実行してください。")
 
 
 if __name__ == "__main__":

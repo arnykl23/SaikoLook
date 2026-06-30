@@ -1,4 +1,4 @@
-"""ReplyGuard API.
+"""SaikoLook API.
 
 全層（取得・分析・採点・永続化・通知）を lifespan で結線し FastAPI で公開する.
 PoC 時代の GET /emails / GET /health の形は後方互換で維持する. ドメイン例外を
@@ -133,7 +133,7 @@ async def lifespan(app: FastAPI):
             app.state.scheduler.shutdown(wait=False)
 
 
-app = FastAPI(title="ReplyGuard API", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="SaikoLook API", version="0.2.0", lifespan=lifespan)
 
 # CORS は許可 origin を明示（ワイルドカード禁止）. 別オリジンの悪意あるサイトから
 # 受信トレイのプレビューを読まれないよう, フロントの origin だけ許可する.

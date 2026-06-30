@@ -6,7 +6,7 @@ API 層がこれらを捕捉して HTTP ステータスへ写像する（例: Co
 
 
 class DomainError(Exception):
-    """ReplyGuard ドメイン例外の基底."""
+    """SaikoLook ドメイン例外の基底."""
 
 
 class NotFoundError(DomainError):

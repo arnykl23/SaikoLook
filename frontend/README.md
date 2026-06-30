@@ -1,6 +1,6 @@
-# ReplyGuard Frontend
+# SaikoLook Frontend
 
-ReplyGuard のダッシュボード（Vite + Vue 3 + TypeScript）。トリアージ順にメッセージを一覧表示し、対応状態を変更する。
+SaikoLook のダッシュボード（Vite + Vue 3 + TypeScript）。トリアージ順にメッセージを一覧表示し、対応状態を変更する。
 
 ## 起動
 

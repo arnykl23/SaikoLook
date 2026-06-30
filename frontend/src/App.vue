@@ -98,7 +98,7 @@ function updateFavicon(count: number): void {
 }
 
 watch(unhandledCount, (n) => {
-  document.title = n > 0 ? `(${n}) ReplyGuard` : "ReplyGuard";
+  document.title = n > 0 ? `(${n}) SaikoLook` : "SaikoLook";
   updateFavicon(n);
 }, { immediate: true });
 
@@ -716,7 +716,7 @@ onUnmounted(() => {
     <!-- ヘッダー：浮遊ガラスバー -->
     <header class="bar glass">
       <div class="brand">
-        <span class="logo">ReplyGuard</span>
+        <span class="logo">SaikoLook</span>
         <span class="tag-line">受信トレイ管制塔</span>
       </div>
       <div class="search-wrap">

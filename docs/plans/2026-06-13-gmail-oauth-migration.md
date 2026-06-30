@@ -399,7 +399,7 @@ def downgrade() -> None:
 
 - **検証**: `PYTHONPATH=. alembic upgrade head` → `Running upgrade 0006_add_account_address -> 0007_add_oauth_columns, account_configs に OAuth 用列を追加.` が出力される  
   `PYTHONPATH=. alembic downgrade -1` → downgrade が正常完了
-- **完了条件**: `alembic upgrade head` が 0 で終了し，`data/replyguard.db` の `account_configs` テーブルに `auth_type`, `auth_status` 等 6 列が存在する
+- **完了条件**: `alembic upgrade head` が 0 で終了し，`data/ReplyGuard.db` の `account_configs` テーブルに `auth_type`, `auth_status` 等 6 列が存在する
 - **commit**: `feat(db): account_configs に OAuth 用列 6 本を追加するマイグレーション`
 
 ---
@@ -1497,7 +1497,7 @@ def test_callback_returns_400_for_invalid_state():
 1. **DB マイグレーション確認**:
    ```bash
    PYTHONPATH=. alembic upgrade head
-   sqlite3 data/replyguard.db ".schema account_configs"
+   sqlite3 data/ReplyGuard.db ".schema account_configs"
    # → auth_type, refresh_token, auth_status 等の列が存在すること
    ```
 
@@ -1554,7 +1554,7 @@ def test_callback_returns_400_for_invalid_state():
 |---|---|
 | Google Cloud の「Web アプリ」タイプ Client ID 未作成 | 実装前に前提セットアップを完了させる．Client ID 未設定時 API が 400 を返す設計になっているので IMAP は影響なし |
 | Testing モードで refresh_token が 7 日で失効 | `auth_status='reauth_required'` + バナー UX で対処．PoC として許容 |
-| SQLite の `batch_alter_table` で既存データが消える | マイグレーション前に `cp data/replyguard.db data/replyguard.db.bak` でバックアップを取る．壊れたら `cp data/replyguard.db.bak data/replyguard.db` で戻す |
+| SQLite の `batch_alter_table` で既存データが消える | マイグレーション前に `cp data/ReplyGuard.db data/ReplyGuard.db.bak` でバックアップを取る．壊れたら `cp data/ReplyGuard.db.bak data/ReplyGuard.db` で戻す |
 | `_pending_states` がサーバ再起動で消える | ユーザーはもう一度「Google で接続」を押せば再取得できるため PoC として許容 |
 | `GmailApiSource` の Gmail API レート制限（1日 250 quota unit） | 定期取得は 5 分毎・10 件取得のため通常運用では超えない |
 

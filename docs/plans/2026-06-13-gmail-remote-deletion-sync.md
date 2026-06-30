@@ -214,7 +214,7 @@ last_history_id: Mapped[str | None] = mapped_column(String, nullable=True)
          with op.batch_alter_table("account_configs") as batch_op:
              batch_op.drop_column("last_history_id")
      ```
-- 検証: `alembic upgrade head && alembic current`（`migrations/env.py:23` が `sqlalchemy.url` を `Settings.database_url` から設定するため CLI でそのまま動く）→ 期待: `current` が `0008_add_last_history_id (head)`．列確認（既定 `data/replyguard.db` 前提）は `python -c "from app.repositories import db; from sqlalchemy import inspect; print('last_history_id' in {c['name'] for c in inspect(db.engine).get_columns('account_configs')})"` → 期待: `True`（起動時 `app/repositories/migrations.py:run_migrations` でも自動適用される．`DATABASE_URL` を差し替えている場合は同じ URL で確認すること）
+- 検証: `alembic upgrade head && alembic current`（`migrations/env.py:23` が `sqlalchemy.url` を `Settings.database_url` から設定するため CLI でそのまま動く）→ 期待: `current` が `0008_add_last_history_id (head)`．列確認（既定 `data/ReplyGuard.db` 前提）は `python -c "from app.repositories import db; from sqlalchemy import inspect; print('last_history_id' in {c['name'] for c in inspect(db.engine).get_columns('account_configs')})"` → 期待: `True`（起動時 `app/repositories/migrations.py:run_migrations` でも自動適用される．`DATABASE_URL` を差し替えている場合は同じ URL で確認すること）
 - 完了条件: マイグレーション適用後 `account_configs.last_history_id` 列が存在し，downgrade で消える
 - commit: `feat: account_configs に Gmail History カーソル列 last_history_id を追加`
 

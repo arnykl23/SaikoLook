@@ -152,7 +152,7 @@ svg.overlay {
 <body>
 
 <h1>ReplyGuard — AWS Architecture</h1>
-<p class="subtitle">ap-northeast-1 · replyguard.io · 最小構成 ~$10/月</p>
+<p class="subtitle">ap-northeast-1 · ReplyGuard.io · 最小構成 ~$10/月</p>
 
 <div class="canvas">
 
@@ -288,14 +288,14 @@ svg.overlay {
   <div class="node" style="left:230px;top:55px;">
     <div class="icon ic-red">🔒</div>
     <div class="nname">ACM</div>
-    <div class="nspec">SSL証明書<br>*.replyguard.io<br>DNS検証・無料</div>
+    <div class="nspec">SSL証明書<br>*.ReplyGuard.io<br>DNS検証・無料</div>
   </div>
 
   <!-- Route53  (230, 200) → (318, 310) -->
   <div class="node" style="left:230px;top:200px;">
     <div class="icon ic-orange">🌐</div>
     <div class="nname">Route 53</div>
-    <div class="nspec">replyguard.io<br>A → CloudFront<br>$0.5/月</div>
+    <div class="nspec">ReplyGuard.io<br>A → CloudFront<br>$0.5/月</div>
   </div>
 
   <!-- CloudFront  (380, 200) → (468, 310) -->
@@ -316,21 +316,21 @@ svg.overlay {
   <div class="node" style="left:380px;top:375px;">
     <div class="icon ic-orange">⚖️</div>
     <div class="nname">ALB</div>
-    <div class="nspec">replyguard-alb<br>HTTPS:443<br>→ ECS:8000</div>
+    <div class="nspec">ReplyGuard-alb<br>HTTPS:443<br>→ ECS:8000</div>
   </div>
 
   <!-- ECS Fargate  (545, 375) → (633, 485) -->
   <div class="node" style="left:545px;top:375px;">
     <div class="icon ic-blue">🐳</div>
     <div class="nname">ECS Fargate</div>
-    <div class="nspec">FastAPI:8000<br>0.25vCPU/512MB<br>replyguard-api</div>
+    <div class="nspec">FastAPI:8000<br>0.25vCPU/512MB<br>ReplyGuard-api</div>
   </div>
 
   <!-- ECR  (735, 185) → (823, 295) -->
   <div class="node" style="left:735px;top:185px;">
     <div class="icon ic-blue">📦</div>
     <div class="nname">ECR</div>
-    <div class="nspec">replyguard-api<br>:latest / :{sha}</div>
+    <div class="nspec">ReplyGuard-api<br>:latest / :{sha}</div>
   </div>
 
   <!-- IAM  (735, 365) → (823, 475) -->
@@ -412,7 +412,7 @@ svg.overlay {
     <h3>ECS Task Definition</h3>
     <div class="kv"><span class="k">CPU</span><span class="v">256 (0.25 vCPU)</span></div>
     <div class="kv"><span class="k">Memory</span><span class="v">512 MB</span></div>
-    <div class="kv"><span class="k">Image</span><span class="v">ECR / replyguard-api:latest</span></div>
+    <div class="kv"><span class="k">Image</span><span class="v">ECR / ReplyGuard-api:latest</span></div>
     <div class="kv"><span class="k">Port</span><span class="v">8000 (TCP)</span></div>
     <div class="kv"><span class="k">Env</span><span class="v">Secrets Manager から注入</span></div>
     <div class="kv"><span class="k">Desired</span><span class="v">1 task (PoC)</span></div>
@@ -424,7 +424,7 @@ svg.overlay {
     <div class="kv"><span class="k">Instance</span><span class="v">db.t3.micro</span></div>
     <div class="kv"><span class="k">Storage</span><span class="v">20 GB gp3</span></div>
     <div class="kv"><span class="k">Multi-AZ</span><span class="v">No (PoC)</span></div>
-    <div class="kv"><span class="k">DB name</span><span class="v">replyguard</span></div>
+    <div class="kv"><span class="k">DB name</span><span class="v">ReplyGuard</span></div>
     <div class="kv"><span class="k">Port</span><span class="v">5432 (private subnet のみ)</span></div>
   </div>
 

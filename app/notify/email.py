@@ -29,7 +29,7 @@ class EmailNotifier(BaseNotifier):
         summary = record.analysis.summary if record.analysis else ""
 
         mime = MimeMessage()
-        mime["Subject"] = f"[ReplyGuard] 重要メール (importance={importance})"
+        mime["Subject"] = f"[SaikoLook] 重要メール (importance={importance})"
         mime["From"] = s.notify_email_from or s.smtp_user
         mime["To"] = s.notify_email_to
         mime.set_content(

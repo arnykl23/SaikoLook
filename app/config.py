@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     # === DB（永続化層）===
     # 既定はローカル SQLite（追加アカウント不要）. Supabase/Postgres に上げる時は
     # app.env で DATABASE_URL=postgresql+psycopg2://... を設定する.
-    database_url: str = "sqlite:///./data/replyguard.db"
+    database_url: str = "sqlite:///./data/SaikoLook.db"
 
     # === 認証（API 層）===
     # デモ簡便のため既定無効. 有効化時は JWT_SECRET を必ず設定する.

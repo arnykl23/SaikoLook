@@ -27,7 +27,7 @@ class SlackNotifier(BaseNotifier):
         importance = record.analysis.importance if record.analysis else "-"
         summary = record.analysis.summary if record.analysis else ""
         text = (
-            f":mailbox: *ReplyGuard 重要メール* (importance={importance})\n"
+            f":mailbox: *SaikoLook 重要メール* (importance={importance})\n"
             f"*件名*: {record.email.subject}\n"
             f"*差出人*: {record.email.sender}\n"
             f"*要約*: {summary}"

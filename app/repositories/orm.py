@@ -50,7 +50,7 @@ class AccountConfigORM(Base):
 
     PoC: credential（アプリパスワード等）は平文保存.
     本番環境では必ず暗号化すること（Fernet / SQLCipher 等）.
-    DB ファイル（data/replyguard.db）は .gitignore 済みのため, ローカル PoC では許容.
+    DB ファイル（data/SaikoLook.db）は .gitignore 済みのため, ローカル PoC では許容.
     """
 
     __tablename__ = "account_configs"

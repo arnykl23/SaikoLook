@@ -56,9 +56,9 @@ services:
     image: postgres:16-alpine
     # 既定値は開発用. 本番では secrets/app.env で POSTGRES_PASSWORD を必ず変更する.
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-replyguard}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-replyguard}
-      - POSTGRES_DB=${POSTGRES_DB:-replyguard}
+      - POSTGRES_USER=${POSTGRES_USER:-SaikoLook}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-SaikoLook}
+      - POSTGRES_DB=${POSTGRES_DB:-SaikoLook}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
